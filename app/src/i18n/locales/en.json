@@ -1,0 +1,10 @@
+{
+  "app": { "name": "FitDoing" },
+  "tabs": { "today": "Today", "records": "Records", "settings": "Settings" },
+  "common": { "approx": "about", "next": "Next", "kcal": "kcal" },
+  "placeholder": {
+    "today": "Today is coming soon",
+    "records": "Records are coming soon",
+    "settings": "Settings are coming soon"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "app": { "name": "FitDoing" },
+  "tabs": { "today": "오늘", "records": "기록", "settings": "설정" },
+  "common": { "approx": "약", "next": "다음", "kcal": "kcal" },
+  "placeholder": {
+    "today": "오늘 화면을 준비하고 있어요",
+    "records": "기록 화면을 준비하고 있어요",
+    "settings": "설정 화면을 준비하고 있어요"
+  }
+}

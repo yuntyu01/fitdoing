@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "FitDoing",
+    "slug": "fitdoing",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "fitdoing",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F2F4F6",
+    "ios": {
+      "bundleIdentifier": "com.fitdoing.app"
+    },
+    "android": {
+      "package": "com.fitdoing.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#F2F4F6",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-localization",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F2F4F6",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

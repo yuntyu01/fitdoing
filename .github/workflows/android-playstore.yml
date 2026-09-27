@@ -1,0 +1,162 @@
+name: "CD: Android Play Store"
+
+on:
+  # 손으로 실행: 트랙을 고르고, 필요하면 버전 이름을 덮어쓴다.
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play Console release track"
+        required: true
+        default: "alpha"
+        type: choice
+        options: [alpha, internal, beta, production]
+      version_name:
+        description: "versionName override (예: 0.1.0). 비우면 app.json 값을 쓴다"
+        required: false
+        type: string
+      dry_run:
+        description: "AAB 만 만들고 Play 업로드는 건너뛴다 (키스토어가 없으면 디버그 서명)"
+        required: false
+        default: false
+        type: boolean
+  # v0.1.0 같은 태그를 밀면 비공개 테스트(alpha) 트랙으로 올린다.
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# versionCode 가 겹치지 않게 한 번에 한 빌드만 돈다.
+concurrency:
+  group: android-playstore
+  cancel-in-progress: false
+
+jobs:
+  deploy-android:
+    name: Build AAB and upload to Play
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Resolve release metadata
+        run: |
+          # versionCode 는 2025-01-01 부터의 분 단위 시각. 어느 경로로 돌든 단조 증가한다.
+          echo "ANDROID_VERSION_CODE=$(( ($(date -u +%s) - 1735689600) / 60 ))" >> "$GITHUB_ENV"
+          if [ -n "${{ inputs.track }}" ]; then
+            echo "PLAY_TRACK=${{ inputs.track }}" >> "$GITHUB_ENV"
+            echo "DRY_RUN=${{ inputs.dry_run }}" >> "$GITHUB_ENV"
+            if [ -n "${{ inputs.version_name }}" ]; then
+              echo "ANDROID_VERSION_NAME=${{ inputs.version_name }}" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "PLAY_TRACK=alpha" >> "$GITHUB_ENV"
+            echo "DRY_RUN=false" >> "$GITHUB_ENV"
+            echo "ANDROID_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      # 30분짜리 빌드 끝에서 터지지 않게 비밀값부터 확인한다.
+      # dry run 에서는 키스토어가 없어도 디버그 서명으로 빌드만 확인한다.
+      - name: Check required secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          missing=()
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD PLAY_SERVICE_ACCOUNT_JSON; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "SIGN_RELEASE=true" >> "$GITHUB_ENV"
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::빠진 GitHub Secret: ${missing[*]} (dry run 이라 계속 진행)"
+            else
+              echo "::error::빠진 GitHub Secret: ${missing[*]} (docs/android-release.md 참고)"
+              exit 1
+            fi
+          fi
+
+      - run: npm ci
+
+      - name: Stamp version into app.json
+        run: node ./scripts/set-android-version.js
+
+      - name: Generate Android project with Expo prebuild
+        run: npx expo prebuild --platform android
+
+      - name: Configure Android release signing
+        if: env.SIGN_RELEASE == 'true'
+        run: node ./scripts/configure-android-release.js
+
+      # prebuild 가 android/ 를 다시 만들기 때문에 키스토어는 그 뒤에 푼다.
+      - name: Restore Android keystore
+        if: env.SIGN_RELEASE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          keystore_path="$GITHUB_WORKSPACE/app/android/app/release-keystore.jks"
+          echo "STORE_FILE=$keystore_path" >> "$GITHUB_ENV"
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$keystore_path"
+          keytool -list -keystore "$keystore_path" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.KEY_ALIAS }}" > /dev/null
+          echo "키스토어 복원 확인"
+
+      - name: Build release AAB
+        working-directory: ./app/android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fitdoing-${{ env.ANDROID_VERSION_CODE }}-aab
+          path: app/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload AAB to Play Console
+        if: env.DRY_RUN != 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.fitdoing.app
+          releaseFiles: app/android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ env.PLAY_TRACK }}
+          status: completed
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Android release"
+            echo "- versionName: \`${ANDROID_VERSION_NAME:-app.json 값}\`"
+            echo "- versionCode: \`${ANDROID_VERSION_CODE}\`"
+            echo "- track: \`${PLAY_TRACK}\`"
+            echo "- 서명: \`$([ "$SIGN_RELEASE" = "true" ] && echo 업로드 키 || echo 디버그)\`"
+            echo "- Play 업로드: \`$([ "$DRY_RUN" = "true" ] && echo 건너뜀 || echo 실행)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
