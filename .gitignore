@@ -22,3 +22,10 @@ service-account*.json
 
 # Go
 server/bin/
+
+# 로컬 모듈 Gradle 산출물
+modules/**/android/build/
+modules/**/android/.cxx/
+
+# 개발용 서버 DB
+server/dev.db

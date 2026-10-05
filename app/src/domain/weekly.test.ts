@@ -1,0 +1,64 @@
+import { weeklySeries, type WeeklyRow } from './weekly';
+
+const row = (date: string, kcal: number, portion = 1): WeeklyRow => ({
+  date,
+  ai: { kcal, carbs: kcal / 10, protein: kcal / 20, fat: kcal / 30 },
+  portion,
+});
+
+// 2026-09-26 은 토요일. 이번 주 = 9/21(월) ~ 9/27(일), 지난주 = 9/14 ~ 9/20
+const NOW = new Date(2026, 8, 26, 18, 40);
+
+describe('weeklySeries', () => {
+  const rows = [
+    row('2026-09-14', 1700),
+    row('2026-09-15', 1500),
+    row('2026-09-23', 1500),
+    row('2026-09-24', 1800),
+    row('2026-09-26', 400),
+    row('2026-09-26', 760, 0.5), // 먹은 비율을 곱한다 → 380
+  ];
+  const s = weeklySeries(rows, 'kcal', 1600, NOW);
+
+  it('요일 상태를 나눈다', () => {
+    expect(s.days.map((d) => d.state)).toEqual(['missing', 'missing', 'done', 'done', 'missing', 'today', 'future']);
+  });
+
+  it('오늘 값은 진행 중인 합계, 미래·기록 없는 날은 null', () => {
+    expect(s.days[5].current).toBe(780);
+    expect(s.days[6].current).toBeNull();
+    expect(s.days[0].current).toBeNull();
+  });
+
+  it('지난주 같은 요일 값을 붙인다', () => {
+    expect(s.days[0].last).toBe(1700);
+    expect(s.days[1].last).toBe(1500);
+    expect(s.days[2].last).toBeNull();
+  });
+
+  it('평균은 오늘을 뺀 기록한 날만 센다', () => {
+    expect(s.avg).toBe(1650);
+    expect(s.lastAvg).toBe(1600);
+  });
+
+  it('목표 범위는 ±10%', () => {
+    expect(s.band.lo).toBeCloseTo(1440);
+    expect(s.band.hi).toBeCloseTo(1760);
+  });
+
+  it('기록이 하나도 없으면 평균은 null', () => {
+    const e = weeklySeries([], 'kcal', 1600, NOW);
+    expect(e.avg).toBeNull();
+    expect(e.lastAvg).toBeNull();
+    expect(e.max).toBeGreaterThan(1600);
+  });
+
+  it('나눠 먹은 끼니는 절반으로 센다', () => {
+    const shared: WeeklyRow = { ...row('2026-09-24', 1000), sharedMeal: true };
+    expect(weeklySeries([shared], 'kcal', 1600, NOW).days[3].current).toBe(500);
+  });
+
+  it('지표를 바꿀 수 있다', () => {
+    expect(weeklySeries(rows, 'protein', 100, NOW).days[3].current).toBe(90);
+  });
+});

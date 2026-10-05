@@ -23,6 +23,7 @@ describe('roundGram', () => {
 describe('approxKcal', () => {
   it('"약"과 천 단위 구분 기호를 붙인다', () => {
     expect(approxKcal(1158, '약')).toBe('약 1,160');
-    expect(approxKcal(1158, 'about', 'en-US')).toBe('about 1,160');
+    expect(approxKcal(1158, 'about')).toBe('about 1,160');
+    expect(approxKcal(12345, '약')).toBe('약 12,350');
   });
 });

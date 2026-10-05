@@ -11,12 +11,12 @@ export function roundGram(g: number): number {
   return Math.round(g);
 }
 
-/** 1160 -> "1,160" (로케일 구분 기호). */
-export function formatNumber(n: number, locale = 'ko-KR'): string {
-  return n.toLocaleString(locale);
+/** 1160 -> "1,160". Hermes Intl 지원 차이를 피하려고 직접 찍는다. (ko/en 모두 쉼표) */
+export function formatNumber(n: number): string {
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 /** 추정 칼로리 표시: "약 1,160" */
-export function approxKcal(kcal: number, prefix: string, locale = 'ko-KR'): string {
-  return `${prefix} ${formatNumber(roundKcal(kcal), locale)}`;
+export function approxKcal(kcal: number, prefix: string): string {
+  return `${prefix} ${formatNumber(roundKcal(kcal))}`;
 }

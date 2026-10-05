@@ -1,16 +1,19 @@
 import { integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+import type { MealSlot } from '../domain/meals';
+import type { Goal, Targets } from '../domain/targets';
+
 // 날짜는 기기 로컬 기준 'YYYY-MM-DD', 시각은 epoch ms, 하루 중 시각은 'HH:mm'.
 
 export type Mode = 'mild' | 'normal' | 'spicy';
-export type Goal = 'lose' | 'keep' | 'gain';
+export type { Goal };
 
 export interface Settings {
   mode: Mode;
   goal: Goal;
   heightCm: number;
   weightKg: number;
-  meals: { index: number; deadline: string }[];
+  meals: MealSlot[];
   gym: {
     enabled: boolean;
     days: number[]; // 0=월 ... 6=일
@@ -23,7 +26,7 @@ export interface Settings {
   };
   sleep: { enabled: boolean; bedTime: string; wakeTime: string };
   coupons: { rest: number; cheat: number };
-  targets: { kcal: number; carbs: number; protein: number; fat: number };
+  targets: Targets;
   allowedApps: string[];
   lockMinutes: number;
   emergencyPerWeek: number;

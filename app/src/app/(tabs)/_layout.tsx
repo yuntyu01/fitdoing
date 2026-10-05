@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router';
-import { House, NotebookText, Settings } from 'lucide-react-native';
+import { House, Settings, SquareMenu } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
-import { colors, fonts } from '../../ui/tokens';
+import { colors, fonts, radius } from '../../ui/tokens';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -13,16 +13,24 @@ export default function TabsLayout() {
         headerShown: false,
         sceneStyle: { backgroundColor: colors.bg },
         tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.faint,
+        tabBarInactiveTintColor: colors.sub,
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.line },
+        // 시안: 선 없이 윗모서리만 둥근 흰 막대
+        tabBarStyle: {
+          backgroundColor: colors.card,
+          borderTopWidth: 0,
+          borderTopLeftRadius: radius.card,
+          borderTopRightRadius: radius.card,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: t('tabs.today'),
-          tabBarIcon: ({ color, size }) => <House color={color} size={size} strokeWidth={1.8} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <House color={color} size={size} strokeWidth={1.8} fill={focused ? color : 'none'} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -30,7 +38,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.records'),
           tabBarIcon: ({ color, size }) => (
-            <NotebookText color={color} size={size} strokeWidth={1.8} />
+            <SquareMenu color={color} size={size} strokeWidth={1.8} />
           ),
         }}
       />
