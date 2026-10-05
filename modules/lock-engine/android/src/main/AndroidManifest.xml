@@ -1,0 +1,35 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- 권한·queries·딥링크 meta-data 는 config plugin(plugin/index.js)이 앱 매니페스트에 넣는다. -->
+  <application>
+    <service
+      android:name="expo.modules.lockengine.core.LockService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="User-scheduled app lock: watches the foreground app while a self-chosen lock is active and shows a lock screen over blocked apps" />
+    </service>
+
+    <receiver android:name="expo.modules.lockengine.core.AlarmReceiver" android:exported="false" />
+
+    <receiver android:name="expo.modules.lockengine.core.BootReceiver" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+      </intent-filter>
+    </receiver>
+
+    <activity
+      android:name="expo.modules.lockengine.core.LockActivity"
+      android:exported="false"
+      android:launchMode="singleInstance"
+      android:taskAffinity=""
+      android:excludeFromRecents="true"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:screenOrientation="portrait"
+      android:theme="@android:style/Theme.Material.NoActionBar" />
+  </application>
+</manifest>
