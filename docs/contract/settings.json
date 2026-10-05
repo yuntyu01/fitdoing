@@ -1,0 +1,29 @@
+{
+  "mode": "normal",
+  "goal": "keep",
+  "heightCm": 175,
+  "weightKg": 70,
+  "meals": [
+    { "index": 1, "deadline": "08:00" },
+    { "index": 2, "deadline": "14:00" },
+    { "index": 3, "deadline": "17:00" },
+    { "index": 4, "deadline": "19:00" }
+  ],
+  "gym": {
+    "enabled": true,
+    "days": [0, 2, 4, 5, 6],
+    "arriveBy": "19:00",
+    "name": "바디핏짐 성수점",
+    "address": "서울 성동구 연무장길 00",
+    "lat": 37.5446,
+    "lng": 127.0557,
+    "radiusM": 150
+  },
+  "sleep": { "enabled": true, "bedTime": "23:30", "wakeTime": "07:00" },
+  "coupons": { "rest": 2, "cheat": 2 },
+  "targets": { "kcal": 1600, "carbs": 180, "protein": 100, "fat": 53 },
+  "allowedApps": ["com.kakao.talk"],
+  "lockMinutes": 120,
+  "emergencyPerWeek": 2,
+  "photoBackup": false
+}
