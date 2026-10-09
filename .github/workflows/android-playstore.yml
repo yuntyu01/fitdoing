@@ -51,6 +51,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Four React Native ABIs need more disk than the hosted image leaves free.
+      # These preinstalled toolchains are unused by this Android-only job.
+      - name: Reclaim runner disk space
+        working-directory: ${{ github.workspace }}
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL /usr/share/swift
+          df -h /
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
