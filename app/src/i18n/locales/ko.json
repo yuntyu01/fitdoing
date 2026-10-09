@@ -21,9 +21,200 @@
   "weekdayShort": { "0": "월", "1": "화", "2": "수", "3": "목", "4": "금", "5": "토", "6": "일" },
   "weekdayLong": { "0": "월요일", "1": "화요일", "2": "수요일", "3": "목요일", "4": "금요일", "5": "토요일", "6": "일요일" },
   "date": { "full": "{{month}}월 {{day}}일 {{weekday}}" },
-  "goal": { "lose": "감량", "keep": "유지", "gain": "증량" },
+  "goal": { "lose": "감량", "keep": "유지", "gain": "린매스업", "bulk": "벌크업" },
+  "goalDesc": {
+    "lose": "유지 칼로리보다 적게 먹어요",
+    "keep": "지금 체중을 유지해요",
+    "gain": "유지 칼로리보다 조금 더 먹어요",
+    "bulk": "유지 칼로리보다 더 많이 먹어요"
+  },
+  "sex": {
+    "male": "남성",
+    "female": "여성",
+    "unset": "선택 안 함"
+  },
+  "activity": {
+    "sedentary": "비활동적",
+    "low": "저활동적",
+    "active": "활동적",
+    "veryActive": "매우 활동적"
+  },
+  "activityDesc": {
+    "sedentary": "운동 없이 대부분 앉아서 지내요",
+    "low": "일상 활동에 가벼운 걷기·운동이 조금 더해져요 (한국 성인 대부분)",
+    "active": "하루에 걷기·운동 같은 활동이 꽤 많아요",
+    "veryActive": "고강도 운동이나 몸 쓰는 일을 하루 오래 해요"
+  },
+  "macro": {
+    "carbs": "탄수화물",
+    "protein": "단백질",
+    "fat": "지방"
+  },
+  "ratio": {
+    "r532": "5 : 3 : 2",
+    "r433": "4 : 3 : 3"
+  },
+  "foodStyle": {
+    "screenDesc": "어떤 음식을 고르는지 저장해요. 영양 목표(탄단지 계산)와는 따로예요. 아직 음식 추천이나 성분 판별에는 쓰지 않아요.",
+    "title": "음식 선택 방식",
+    "more": "그 밖의 방식",
+    "pattern": {
+      "general": "일반",
+      "vegetarian": "채식",
+      "vegan": "비건",
+      "mediterranean": "지중해식",
+      "carnivore": "카니보어"
+    },
+    "desc": {
+      "general": "가리는 음식 없이 골라요",
+      "vegetarian": "고기·생선은 먹지 않아요. 달걀·유제품은 아래에서 정해요",
+      "vegan": "동물성 식품을 먹지 않아요",
+      "mediterranean": "채소·콩·통곡물·생선·올리브유 위주로 골라요",
+      "carnivore": "동물성 식품 위주로 골라요. 탄단지 비율은 영양 목표의 계산 모드를 따라요"
+    },
+    "allowTitle": "먹는 것",
+    "eggs": "달걀",
+    "dairy": "우유·유제품",
+    "allergyTitle": "알레르기",
+    "allergyPlaceholder": "예: 땅콩, 새우 (쉼표로 구분)",
+    "allergyNote": "음식 선택 방식과 따로 저장해요. 지금은 기록용이고, 사진 속 음식의 알레르기 성분을 판별하지 않아요."
+  },
+  "nutrition": {
+    "title": "영양 목표",
+    "step1": "신체 정보와 목표",
+    "step2": "일상 활동과 운동",
+    "step2Desc": "하루 활동을 적고, 마지막에 활동 단계를 직접 골라 주세요.",
+    "step3": "계산 방식",
+    "step4": "결과 확인",
+    "step4Desc": "유지 칼로리 추정값과 목표를 확인하고 적용해요. 적용하기 전까지 지금 목표는 바뀌지 않아요.",
+    "apply": "이 목표로 적용하기",
+    "seeResult": "결과 보기",
+    "bodyNote": "성별·나이를 비워 두면 자동 계산 대신 직접 설정만 쓸 수 있어요.",
+    "scopeTitle": "자동 계산 대상 확인",
+    "scopeNote": "일반 자동 계산은 19세 이상 성인용이에요. 아래에 해당하거나 19세 미만이면 일반 성인 감량 계산을 쓰지 않고 직접 설정만 열어요. 목표는 담당 의료진·전문가와 정하세요.",
+    "special": {
+      "pregnant": "임신 중",
+      "lactating": "수유 중",
+      "medicalDiet": "질환 치료를 위한 식단 중"
+    },
+    "dailyTitle": "평소 하루",
+    "daily": {
+      "sitting": "주로 앉아 있어요",
+      "standing": "서 있는 시간이 많아요",
+      "walking": "걷는 시간이 많아요",
+      "manual": "몸 쓰는 일을 해요"
+    },
+    "exerciseTitle": "운동",
+    "exercise": {
+      "none": "따로 안 해요",
+      "strength": "근력 운동",
+      "cardio": "유산소",
+      "mixed": "근력 + 유산소",
+      "sports": "구기·기타 스포츠"
+    },
+    "perWeek": "주당 횟수",
+    "perWeekValue": "주 {{n}}회",
+    "minutes": "한 번에",
+    "minuteUnit": "분",
+    "intensity": "강도",
+    "intensityLevel": {
+      "light": "가볍게",
+      "moderate": "보통",
+      "vigorous": "격하게"
+    },
+    "levelTitle": "활동 단계 확인",
+    "levelNote": "위 내용을 참고해 운동까지 포함한 하루 전체로 골라 주세요. 운동 횟수만으로 단계를 정하는 검증된 기준이 없어서 앱이 대신 정하지 않아요. 고른 단계에 운동이 포함되므로 운동 칼로리를 식사 목표에 따로 더하지 않아요.",
+    "levelMeta": "신체활동수준 {{pal}} · 계수 {{pa}}",
+    "modeTitle": "영양 목표 계산",
+    "modeBlocked": "자동 계산 대상이 아니라서 직접 설정만 쓸 수 있어요.",
+    "mode": {
+      "balanced": "일반 균형",
+      "training": "운동 중심",
+      "custom": "직접 설정"
+    },
+    "modeDesc": {
+      "balanced": "칼로리 비율로 나눠요. 시작값 탄수 55 · 단백질 20 · 지방 25%",
+      "training": "단백질을 체중(g/kg)으로 먼저 정하고 나머지를 나눠요",
+      "custom": "비율이나 g을 직접 정해요"
+    },
+    "adjustTitle": "목표 조정",
+    "adjustNote": "{{goal}} 목표의 앱 시작값은 {{start}}예요. 앱 정책 값이고 공식 권장값이 아니에요. 사람마다 맞는 정도가 달라서 바꿀 수 있어요.",
+    "balancedTitle": "칼로리 비율",
+    "balancedNote": "앱이 고른 시작값이에요. 하나뿐인 공식 권장 비율은 아니에요.",
+    "trainingTitle": "단백질과 지방",
+    "trainingNote": "시작값은 앱이 정한 값이에요(감량 2.0 · 유지 1.6 · 린매스업·벌크업 1.8g/kg, 지방 25%). 참고로 ISSN(2017)은 운동하는 사람 대부분에게 하루 1.4–2.0g/kg를 제시해요. 남은 칼로리는 탄수화물로 채워요.",
+    "proteinPerKg": "단백질",
+    "fatPct": "지방",
+    "customTitle": "직접 설정",
+    "customKind": {
+      "ratio": "비율",
+      "fixKcal": "kcal + 2개",
+      "grams": "g 3개"
+    },
+    "customDesc": {
+      "ratio": "칼로리와 탄·단·지 비율(합계 100%)을 정해요. 무게가 아니라 칼로리 비율이에요.",
+      "fixKcal": "칼로리와 영양소 두 개를 정하면 나머지 하나를 계산해요.",
+      "grams": "탄·단·지 g을 정하면 총 칼로리를 계산해요."
+    },
+    "solveTitle": "계산할 영양소",
+    "ratioSum": "합계 {{sum}}%",
+    "advancedTitle": "고급 식단 설정",
+    "advancedNote": "탄수화물을 제한하는 식단이에요. 탄수화물 목표를 정하면 단백질은 계산 방식대로, 남은 칼로리는 지방으로 채워요. 시작값은 앱이 정한 값이고 보편적인 표준이 아니에요.",
+    "carb": {
+      "none": "사용 안 함",
+      "lowCarb": "저탄수",
+      "lchf": "저탄고지",
+      "keto": "케토"
+    },
+    "carbDesc": {
+      "lowCarb": "시작값 탄수 40%. 참고: ADA(2019)는 저탄수를 총열량의 26–45%로 설명해요",
+      "lchf": "시작값 탄수 20%. 탄수를 크게 줄이고 지방을 늘려요",
+      "keto": "총탄수화물 g으로만 정해요. 시작값 50g"
+    },
+    "carbByPct": "칼로리 %",
+    "carbByGrams": "하루 g",
+    "carbTarget": "탄수화물 목표",
+    "ketoTarget": "총탄수화물 목표",
+    "ketoNote": "기록의 탄수화물은 사진으로 추정한 총탄수화물이고, 식이섬유 정보가 없어서 순탄수화물을 계산하지 않아요. 기록만으로 케토시스 여부는 알 수 없어요.",
+    "resultError": "계산할 수 없어요",
+    "kcalTitle": "칼로리",
+    "maintenance": "유지 칼로리 추정",
+    "maintenanceDesc": "{{level}} · 계수 {{pa}}",
+    "adjusted": "목표 조정 {{adj}}",
+    "adjustedStart": "앱 시작값",
+    "adjustedEdited": "직접 바꾼 값",
+    "target": "목표 칼로리",
+    "targetDesc": "50kcal 단위로 반올림",
+    "noExerciseAdd": "유지 칼로리는 2025 한국인 영양소 섭취기준의 성인 에너지필요추정량 식으로 계산해요. 고른 활동 단계에 평소 운동이 들어 있어서, 같은 운동의 소모 칼로리를 다시 더하지 않아요.",
+    "maintenanceRef": "참고: 유지 칼로리 추정",
+    "customKcalNote": "직접 정한 칼로리예요. 유지 칼로리 추정과 따로예요.",
+    "macroTitle": "탄단지",
+    "macroNote": "칼로리 비율로 나눈 값이에요. 적용하면 g은 정수로 반올림해서 저장해요.",
+    "perKg": "체중 1kg당 {{v}}g",
+    "amdrTitle": "참고 범위",
+    "amdrRange": "2025 한국인 영양소 섭취기준의 일반 성인 에너지적정비율은 탄수화물 {{c}}%, 단백질 {{p}}%, 지방 {{f}}%예요. 일반 성인 참고값이라 운동 중심 목표와 다를 수 있어요.",
+    "amdrOutside": "{{names}} 비율이 이 참고 범위 밖이에요. 그래도 저장할 수 있어요.",
+    "compareTitle": "바뀌는 목표",
+    "compareFirst": "처음 정하는 목표예요.",
+    "block": {
+      "missingSex": "성별을 고르지 않아서 유지 칼로리를 계산할 수 없어요. 직접 설정을 쓰거나 1단계에서 성별을 골라 주세요.",
+      "missingAge": "나이를 넣지 않아서 유지 칼로리를 계산할 수 없어요.",
+      "missingActivity": "활동 단계를 고르지 않아서 유지 칼로리를 계산할 수 없어요.",
+      "minor": "19세 미만은 일반 성인 계산을 쓰지 않아요. 직접 설정만 쓸 수 있어요.",
+      "special": "임신·수유·질환 치료 식단에는 일반 성인 계산을 쓰지 않아요. 직접 설정만 쓸 수 있어요."
+    },
+    "err": {
+      "ratioSum": "비율 합계를 100%로 맞춰 주세요.",
+      "negative": "남는 칼로리가 모자라 {{macro}}이(가) 음수가 돼요. 단백질·지방·탄수 목표나 칼로리를 고쳐 주세요.",
+      "belowMin": "목표 칼로리가 {{min}}kcal보다 낮아요. 조정률이나 입력을 고쳐 주세요.",
+      "carbOverKcal": "탄수화물 목표가 총 칼로리보다 커요.",
+      "invalid": "빈 칸이나 숫자가 아닌 값이 있어요."
+    }
+  },
   "onboarding": {
     "goalTitle": "어떤 목표로 시작할까요?",
+    "age": "만 나이",
+    "ageUnit": "세",
     "height": "키",
     "weight": "현재 체중",
     "cm": "cm",
@@ -56,6 +247,7 @@
     "nicknameOptional": "닉네임 (선택)"
   },
   "edit": {
+    "profileTargetsNote": "목표·신체 정보를 바꿔도 영양 목표는 그대로예요. 다시 계산하려면 설정의 영양 목표에서 적용해 주세요.",
     "save": "저장하기",
     "goal": "목표",
     "body": "신체 정보",
@@ -125,6 +317,7 @@
   "weekly": {"title": "주간 그래프", "avg": "주 평균", "target": "목표", "lastWeek": "지난주", "thisWeek": "이번 주", "band": "목표 범위 ±10%", "range": "{{from}} - {{to}}", "achieved": "완료한 {{n}}일 중 {{m}}일 달성", "noneDone": "아직 완료한 날이 없어요", "inProgress": "진행 중", "under": "{{day}}은 {{metric}} 목표보다 {{n}}{{unit}} 적었어요", "over": "{{day}}은 {{metric}} 목표보다 {{n}}{{unit}} 많았어요", "allIn": "완료한 날은 모두 목표 범위 안이에요", "waiting": "지난 날 기록이 쌓이면 여기에서 알려 드려요", "avgLine": "이번 주 평균 {{avg}} · 지난주 {{last}}"},
   "sync": { "title": "서버 동기화", "never": "아직 안 함", "last": "{{time}}", "pending": "대기 {{n}}건" },
   "settings": {
+    "foodStyle": "음식 선택 방식",
     "sectionPlan": "내 계획",
     "sectionApp": "앱 설정",
     "mealsPerDay": "하루 {{n}}끼",
@@ -145,7 +338,7 @@
     "modeSpicyDesc": "단백질 목표, 치팅 쿠폰, 랜덤 식후 사진까지",
     "meals": "끼니 · 마감",
     "mealsValue": "{{n}}끼",
-    "targets": "목표 칼로리 · 탄단지",
+    "targets": "영양 목표",
     "gym": "헬스",
     "sleep": "취침 · 기상",
     "profile": "목표 · 신체",

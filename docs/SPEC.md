@@ -12,7 +12,7 @@
   - 취침: 취침 시각에 잠금 → 기상 시각에 해제
 - 강도 3단계: 순한맛(알림+멈춤만) / 보통맛(2시간 잠금, 기본) / 매운맛(+단백질 최소 목표, 치팅 쿠폰, 랜덤 식후 사진)
 - 탈출구: 전화·문자·지도 항상 허용 / 비상 해제 주 2회 / 휴식권(헬스) / 치팅 쿠폰(매운맛). 쿠폰 사용 시 5초 대기.
-- 안전 규칙(절대): 칼로리 초과로는 절대 잠그지 않는다. 목표 칼로리는 기초대사량 아래로 설정 불가. 표시 숫자는 반올림 + "약".
+- 안전 규칙(절대): 칼로리 초과로는 절대 잠그지 않는다. 섭취량·단백질 미달도 잠금 조건이 아니다(목표는 기록의 기준일 뿐). 목표 칼로리는 기초대사량 아래로 설정 불가. 표시 숫자는 반올림 + "약".
 - 잠금 판단·해제는 전부 폰 안에서(오프라인) 동작해야 한다. 서버가 죽어도 잠금이 걸리고 풀려야 한다. 서버는 AI 중계와 기록 백업만.
 
 ## 2. 기술 스택
@@ -32,7 +32,7 @@
 - 넣지 않는 것: 커뮤니티, 친구, 물, 식단 플랜, 음식 등급, 위젯, iOS
 
 ## 4. 화면 (구성 요약)
-1. 온보딩: 목표(감량/유지/증량)+키·몸무게 → 끼니 수(3~6)와 끼니별 마감 시간 → 헬스 요일·시간·헬스장 위치, 취침/기상 시각 → 권한 안내(카메라, 위치, 사용 기록/오버레이) → 첫 끼니 촬영
+1. 온보딩: 신체·목표(감량/유지/린매스업/벌크업, 성별·나이·키·몸무게) → 일상 활동·운동(활동 단계는 직접 확인) → 영양 목표 계산 모드(일반 균형/운동 중심/직접 설정) → 결과 확인·적용 (docs/nutrition-targets.md) → 끼니 수(3~6)와 끼니별 마감 시간 → 헬스 요일·시간·헬스장 위치, 취침/기상 시각 → 권한 안내(카메라, 위치, 사용 기록/오버레이) → 첫 끼니 촬영
 2. 홈: 날짜 + 오른쪽 위 "휴식 1 · 치팅 2" → 요일 줄(오늘 박스, 기록한 날 점, 헬스 아령, 취침 달) → 끼니 타일 가로 줄(현재 마감 타일만 강조색, 나머지 흰색; 5개 넘으면 가로 스크롤, 현재가 가운데) → 헬스 긴 박스 → 취침 긴 박스 → 안내 한 줄("2끼를 14:00까지 못 찍으면 앱 2시간 잠금") → 오늘 합계(칼로리 막대 + 탄단지 숫자) → 식단 표(1끼~N끼, 빈 끼니는 끼니 목표를 연한 회색으로) → 오른쪽 아래 카메라 원 버튼(마감 10분 이하면 테두리 강조색) → 탭바(오늘·기록·설정)
 3. 촬영: 앱 카메라만(갤러리 불가), 접시 원형 가이드, 셔터, 바코드 모드 전환
 4. 기록 확인: 사진 → 인식 목록(수정 가능) → 얼마나 먹었나 → 나눠 먹음 체크 → 추정 칼로리·탄단지("약") → [기록하기]
@@ -41,7 +41,7 @@
 7. 잠금(취침): "잘 시간이에요 · 07:00에 풀려요", 전화·알람만
 8. 헬스 상세: 거리, 남은 시간, 헬스장 이름·주소, 이번 주 3/5, [사진 인증], [오늘 쉬기]
 9. 기록: 이번 달 요약 3개 → 월간 달력(다 찍음=강조색 채움, 일부=옅음, 잠김=점, 헬스=아령, 취침=달) → 누른 날 카드(칼로리·탄단지·끼니 사진 썸네일·헬스·잠금 여부)
-10. 설정: 강도 / 끼니 수·마감 / 헬스 요일·시간·위치 / 취침·기상 / 쿠폰 장수 / 목표 칼로리·탄단지 / 항상 허용 앱 / 잠금 시간 / 비상 해제 횟수 / 사진 보관 정책
+10. 설정: 강도 / 끼니 수·마감 / 헬스 요일·시간·위치 / 취침·기상 / 쿠폰 장수 / 영양 목표(위 4단계) / 음식 선택 방식(저장만) / 항상 허용 앱 / 잠금 시간 / 비상 해제 횟수 / 사진 보관 정책
 11. 쿠폰 시트: 휴식 1/2 · 치팅 2/2, 이번 주 사용 내역, 월요일 초기화
 
 ## 5. 디자인 규칙
@@ -53,7 +53,7 @@
 - 아이콘: 선 아이콘, 이모지 금지
 
 ## 6. 데이터 모델 (제안, 수정 가능)
-- Settings{mode, meals:[{index, deadline}], gym:{days[], startTime, endTime, lat, lng, radius}, sleep:{bedTime, wakeTime}, coupons:{rest, cheat}, targets:{kcal, carbs, protein, fat}, allowedApps[], lockMinutes, emergencyPerWeek}
+- Settings{mode, meals:[{index, deadline}], gym:{days[], startTime, endTime, lat, lng, radius}, sleep:{bedTime, wakeTime}, coupons:{rest, cheat}, targets:{kcal, carbs, protein, fat}, allowedApps[], lockMinutes, emergencyPerWeek, sex?, age?, activity?, activityInput?, nutrition?(계산 입력), targetHistory[](날짜별 목표), foodStyle, allergies[], fasting?} — 자세한 모양은 docs/contract/settings.json
 - MealLog{id, date, index, deadline, photoUri, barcode?, ai:{items[], kcal, carbs, protein, fat, confidence}, portion, sharedMeal, loggedAt, status: pending|logged|overdue|locked}
 - GymLog{date, checkInAt, checkOutAt, verifiedBy: geofence|photo|rest}
 - SleepLog{date, lockedAt, unlockedAt}

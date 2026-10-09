@@ -1,6 +1,13 @@
 {
   "mode": "normal",
   "goal": "keep",
+  "sex": "male",
+  "age": 30,
+  "activity": "low",
+  "activityInput": {
+    "daily": "sitting",
+    "exercise": { "type": "strength", "perWeek": 4, "minutes": 60, "intensity": "moderate" }
+  },
   "heightCm": 175,
   "weightKg": 70,
   "meals": [
@@ -23,6 +30,18 @@
   "sleep": { "enabled": true, "bedTime": "23:30", "wakeTime": "07:00" },
   "coupons": { "rest": 2, "cheat": 2 },
   "targets": { "kcal": 1600, "carbs": 180, "protein": 100, "fat": 53 },
+  "nutrition": {
+    "formula": "kdri2025-eer-adult",
+    "policy": "fitdoing-2026.10",
+    "goalAdjustPct": null,
+    "plan": { "mode": "training", "proteinPerKg": 1.6, "fatPct": 25, "carb": { "kind": "none" } },
+    "eligibility": { "pregnant": false, "lactating": false, "medicalDiet": false },
+    "appliedOn": "2026-10-08"
+  },
+  "targetHistory": [
+    { "from": "2000-01-01", "kcal": 2100, "carbs": 283, "protein": 112, "fat": 58 },
+    { "from": "2026-10-08", "kcal": 1600, "carbs": 180, "protein": 100, "fat": 53 }
+  ],
   "allowedApps": ["com.kakao.talk"],
   "lockMinutes": 120,
   "emergencyPerWeek": 2,
@@ -30,5 +49,8 @@
   "nickname": "지훈",
   "themeMode": "dark",
   "notifications": true,
-  "shareFriends": true
+  "shareFriends": true,
+  "foodStyle": { "pattern": "vegetarian", "eggs": true, "dairy": false },
+  "allergies": ["땅콩"],
+  "fasting": null
 }

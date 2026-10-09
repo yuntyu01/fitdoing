@@ -25,6 +25,10 @@ import {
 const defaults: Settings = {
   mode: 'normal',
   goal: 'keep',
+  sex: null,
+  age: null,
+  activity: null,
+  activityInput: null,
   heightCm: 175,
   weightKg: 70,
   meals: [
@@ -45,6 +49,8 @@ const defaults: Settings = {
   sleep: { enabled: true, bedTime: '23:30', wakeTime: '07:00' },
   coupons: { rest: 2, cheat: 2 },
   targets: { kcal: 1600, carbs: 180, protein: 100, fat: 53 },
+  nutrition: null,
+  targetHistory: [],
   allowedApps: [],
   lockMinutes: 120,
   emergencyPerWeek: 2,
@@ -53,11 +59,18 @@ const defaults: Settings = {
   themeMode: 'system',
   notifications: true,
   shareFriends: false,
+  foodStyle: { pattern: 'general', eggs: true, dairy: true },
+  allergies: [],
+  fasting: null,
 };
 
 const mine: Settings = {
   mode: 'spicy',
-  goal: 'lose',
+  goal: 'bulk',
+  sex: 'female',
+  age: 27,
+  activity: 'active',
+  activityInput: { daily: 'walking', exercise: { type: 'strength', perWeek: 4, minutes: 60, intensity: 'vigorous' } },
   heightCm: 168,
   weightKg: 61.5,
   meals: [
@@ -78,7 +91,19 @@ const mine: Settings = {
   },
   sleep: { enabled: false, bedTime: '00:30', wakeTime: '08:00' },
   coupons: { rest: 1, cheat: 0 },
-  targets: { kcal: 1800, carbs: 200, protein: 120, fat: 60 },
+  targets: { kcal: 2700, carbs: 307, protein: 111, fat: 115 },
+  nutrition: {
+    formula: 'kdri2025-eer-adult',
+    policy: 'fitdoing-2026.10',
+    goalAdjustPct: 15,
+    plan: { mode: 'training', proteinPerKg: 1.8, fatPct: 25, carb: { kind: 'lchf', by: 'grams', value: 120 } },
+    eligibility: { pregnant: false, lactating: false, medicalDiet: false },
+    appliedOn: '2026-10-08',
+  },
+  targetHistory: [
+    { from: '2000-01-01', kcal: 1800, carbs: 200, protein: 120, fat: 60 },
+    { from: '2026-10-08', kcal: 2700, carbs: 307, protein: 111, fat: 115 },
+  ],
   allowedApps: ['com.kakao.talk'],
   lockMinutes: 180,
   emergencyPerWeek: 1,
@@ -87,6 +112,9 @@ const mine: Settings = {
   themeMode: 'dark',
   notifications: false,
   shareFriends: true,
+  foodStyle: { pattern: 'vegetarian', eggs: true, dairy: false },
+  allergies: ['땅콩'],
+  fasting: { eatFrom: '12:00', eatTo: '20:00' },
 };
 
 // 서버를 거쳐 오는 것처럼 JSON 으로 한 번 갔다 온다 (undefined 는 사라지고 null 은 남는다).
@@ -117,6 +145,55 @@ describe('fromSettingsBody', () => {
     expect(s.gym).toEqual(defaults.gym);
     expect(s.targets).toEqual(defaults.targets);
     expect(s.meals).toEqual(defaults.meals);
+  });
+
+  it('직접 설정(g 고정) 계산 입력도 그대로 돌아온다', () => {
+    const custom: Settings = {
+      ...mine,
+      nutrition: {
+        ...mine.nutrition!,
+        plan: {
+          mode: 'custom',
+          custom: { kind: 'fixKcal', kcal: 2000, solve: 'fat', grams: { carbs: 200, protein: 150, fat: 0 } },
+        },
+      },
+    };
+    expect(fromSettingsBody(wire(toSettingsBody(custom)), defaults)).toEqual(custom);
+  });
+
+  it('예전 설정(새 필드 없음): 목표는 그대로, 성별·나이·활동은 모름(null)으로 둔다', () => {
+    const old = {
+      mode: 'normal',
+      goal: 'gain',
+      heightCm: 175,
+      weightKg: 70,
+      targets: { kcal: 2450, carbs: 330, protein: 126, fat: 68 },
+    };
+    const s = fromSettingsBody(old, { ...defaults, sex: 'male', age: 30, activity: 'low' });
+    expect(s.goal).toBe('gain');
+    expect(s.targets).toEqual(old.targets);
+    expect(s.sex).toBeNull();
+    expect(s.age).toBeNull();
+    expect(s.activity).toBeNull();
+    expect(s.nutrition).toBeNull();
+    expect(s.targetHistory).toEqual([]);
+    expect(s.foodStyle).toEqual({ pattern: 'general', eggs: true, dairy: true });
+  });
+
+  it('모양이 틀린 계산 입력은 버리고(null) 목표는 지킨다', () => {
+    const s = fromSettingsBody(
+      { ...wire(toSettingsBody(mine)), nutrition: { plan: { mode: 'keto' } }, sex: 'other', age: -3 },
+      defaults,
+    );
+    expect(s.nutrition).toBeNull();
+    expect(s.sex).toBeNull();
+    expect(s.age).toBeNull();
+    expect(s.targets).toEqual(mine.targets);
+  });
+
+  it('비건이면 달걀·유제품은 false', () => {
+    const s = fromSettingsBody({ foodStyle: { pattern: 'vegan', eggs: true, dairy: true } }, defaults);
+    expect(s.foodStyle).toEqual({ pattern: 'vegan', eggs: false, dairy: false });
   });
 
   it('허용되지 않는 값은 기본값으로', () => {
@@ -264,7 +341,9 @@ describe('snapshotToRows', () => {
           { date: '2026-09-26', verifiedBy: 'bad' as never, checkInAt: null },
         ],
         sleepLogs: [],
-        lockEvents: [{ type: 'meal', date: '2026-09-24', startedAt: null as never, endedAt: null, releasedBy: null, reason: null }],
+        lockEvents: [
+          { type: 'meal', date: '2026-09-24', startedAt: null as never, endedAt: null, releasedBy: null, reason: null },
+        ],
         couponUses: [],
       },
       defaults,

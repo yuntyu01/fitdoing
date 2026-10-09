@@ -9,16 +9,18 @@ interface Props {
   onChange: (v: string) => void;
   unit: string;
   error?: string;
+  /** 세 칸을 한 줄에 둘 때: 좌우 여백을 줄이고 단위 앞에 틈을 둔다 */
+  compact?: boolean;
 }
 
 /** 라벨 + 얇은 테두리 입력칸 + 오른쪽 단위 (키·몸무게·칼로리) */
-export function NumberField({ label, value, onChange, unit, error }: Props) {
+export function NumberField({ label, value, onChange, unit, error, compact }: Props) {
   const c = usePalette();
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.box}>
+      <View style={[styles.box, compact && styles.boxCompact]}>
         <TextInput
           value={value}
           onChangeText={(v) => onChange(v.replace(/[^0-9.]/g, ''))}
@@ -28,7 +30,7 @@ export function NumberField({ label, value, onChange, unit, error }: Props) {
           selectionColor={c.text}
           accessibilityLabel={label}
         />
-        <Text style={styles.unit}>{unit}</Text>
+        <Text style={[styles.unit, compact && styles.unitCompact]}>{unit}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
@@ -59,5 +61,7 @@ const makeStyles = (c: Palette) =>
       fontVariant: ['tabular-nums'],
     },
     unit: { ...text.body, color: c.sub },
+    boxCompact: { paddingHorizontal: 12 },
+    unitCompact: { marginLeft: 4 },
     error: { ...text.caption, color: c.text },
   });

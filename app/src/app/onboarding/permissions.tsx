@@ -6,9 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatNumber } from '../../domain/format';
-import { defaultTargets } from '../../domain/targets';
 import { requestNotificationPermission } from '../../features/notifications/schedule';
 import { useOnboardingDraft } from '../../features/onboarding/draft';
+import { ONBOARDING_STEPS } from '../../features/onboarding/flow';
 import { FormSection, Rows } from '../../features/settings/editors/Form';
 import { askToEnableNotifications } from '../../features/settings/notifications';
 import { useSettings } from '../../features/settings/store';
@@ -35,7 +35,6 @@ export default function PermissionsStep() {
   const c = usePalette();
   const styles = useThemedStyles(makeStyles);
   const draft = useOnboardingDraft((s) => s.settings);
-  const profile = useOnboardingDraft((s) => s.profile);
   const finalize = useOnboardingDraft((s) => s.finalize);
   const set = useOnboardingDraft((s) => s.set);
   const save = useSettings((s) => s.save);
@@ -68,19 +67,19 @@ export default function PermissionsStep() {
   };
 
   const { gym, sleep } = draft;
-  const kcal = defaultTargets(profile.goal, Number(profile.weight)).kcal;
+  const kcal = draft.targets.kcal;
   const modeLabel = { mild: t('settings.modeMild'), normal: t('settings.modeNormal'), spicy: t('settings.modeSpicy') }[
     draft.mode
   ];
 
   return (
     <Screen
-      header={<StepHeader step={4} total={4} onBack={() => router.back()} />}
+      header={<StepHeader step={7} total={ONBOARDING_STEPS} onBack={() => router.back()} />}
       title={t('onboarding.permTitle')}
       footer={<FullButton label={t('onboarding.permStart')} onPress={start} disabled={busy} />}
     >
       <View>
-        <SummaryRow label={t('onboarding.summaryGoal')} value={t(`goal.${profile.goal}`)} />
+        <SummaryRow label={t('onboarding.summaryGoal')} value={t(`goal.${draft.goal}`)} />
         <SummaryRow label={t('onboarding.summaryMeals')} value={t('settings.mealsPerDay', { n: draft.meals.length })} />
         <SummaryRow
           label={t('onboarding.summaryGym')}

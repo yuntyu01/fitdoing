@@ -1,4 +1,5 @@
 import { sanitizeItem } from './logging';
+import { parseNutritionFields } from './nutritionBody';
 import type { AiResult, FoodItem, Settings } from '../db/schema';
 import type {
   CouponKind,
@@ -91,7 +92,7 @@ const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | null =>
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : null;
 
 const MODES = ['mild', 'normal', 'spicy'] as const;
-const GOALS = ['lose', 'keep', 'gain'] as const;
+const GOALS = ['lose', 'keep', 'gain', 'bulk'] as const;
 const VERIFIED = ['geofence', 'photo', 'rest'] as const;
 const LOCK_KINDS = ['meal', 'gym', 'sleep'] as const;
 const RELEASED = ['action', 'time', 'emergency', 'coupon'] as const;
@@ -114,6 +115,8 @@ export function fromSettingsBody(raw: unknown, defaults: Settings): Settings {
   const out: Settings = {
     mode: oneOf(b.mode, MODES) ?? defaults.mode,
     goal: oneOf(b.goal, GOALS) ?? defaults.goal,
+    // 신체 정보·계산 입력은 없거나 모양이 틀리면 '모름'(null)으로 둔다. 기본값을 실제 정보로 채우지 않는다.
+    ...parseNutritionFields(b),
     heightCm: num(b.heightCm, defaults.heightCm),
     weightKg: num(b.weightKg, defaults.weightKg),
     meals: meals.length > 0 ? meals : defaults.meals.map((m) => ({ ...m })),

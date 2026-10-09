@@ -19,6 +19,7 @@ export interface WeekDay {
   state: WeekDayState;
   current: number | null; // 이번 주 값
   last: number | null; // 지난주 같은 요일 값 (기록이 없으면 null)
+  target: number; // 그날 적용되던 목표 (목표를 바꿔도 지난 날은 그때 목표로 본다)
 }
 
 export interface WeeklySeries {
@@ -27,6 +28,7 @@ export interface WeeklySeries {
   avg: number | null;
   /** 지난주 평균 (기록한 날 기준) */
   lastAvg: number | null;
+  /** 점선: 오늘 목표 */
   target: number;
   band: { lo: number; hi: number };
   /** 막대 높이 계산용 상단 값 */
@@ -52,27 +54,42 @@ export function dailyTotals(rows: WeeklyRow[], metric: WeeklyMetric): Map<string
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
-export function weeklySeries(rows: WeeklyRow[], metric: WeeklyMetric, target: number, now: Date): WeeklySeries {
+/** target: 모든 날 같은 목표(숫자) 또는 날짜별 목표 */
+export function weeklySeries(
+  rows: WeeklyRow[],
+  metric: WeeklyMetric,
+  target: number | ((date: string) => number),
+  now: Date,
+): WeeklySeries {
   const totals = dailyTotals(rows, metric);
   const mon = parseDateKey(weekKey(now));
   const today = dateKey(now);
+  const targetOn = typeof target === 'number' ? () => target : target;
 
   const days: WeekDay[] = Array.from({ length: 7 }, (_, i) => {
     const date = dateKey(addDays(mon, i));
     const lastV = totals.get(dateKey(addDays(mon, i - 7)));
     const v = totals.get(date);
     const state: WeekDayState = date > today ? 'future' : date === today ? 'today' : v ? 'done' : 'missing';
-    return { index: i, date, state, current: state === 'future' || state === 'missing' ? null : (v ?? 0), last: lastV ? lastV : null };
+    return {
+      index: i,
+      date,
+      state,
+      current: state === 'future' || state === 'missing' ? null : (v ?? 0),
+      last: lastV ? lastV : null,
+      target: targetOn(date),
+    };
   });
+  const todayTarget = targetOn(today);
 
   const values = days.flatMap((d) => [d.current ?? 0, d.last ?? 0]);
   return {
     days,
     avg: mean(days.filter((d) => d.state === 'done').map((d) => d.current as number)),
     lastAvg: mean(days.flatMap((d) => (d.last ? [d.last] : []))),
-    target,
-    band: { lo: target * (1 - BAND), hi: target * (1 + BAND) },
-    max: Math.max(target * 1.2, ...values, 1),
+    target: todayTarget,
+    band: { lo: todayTarget * (1 - BAND), hi: todayTarget * (1 + BAND) },
+    max: Math.max(todayTarget * 1.2, ...days.map((d) => d.target * 1.2), ...values, 1),
   };
 }
 
@@ -85,18 +102,18 @@ export interface WeeklySummary {
   furthest: { index: number; diff: number } | null;
 }
 
-/** 홈 주간 그래프 아래 한 줄 요약과 피드백 */
+/** 홈 주간 그래프 아래 한 줄 요약과 피드백. 날마다 그날 목표의 ±10% 로 본다. */
 export function weeklySummary(s: WeeklySeries): WeeklySummary {
   const done = s.days.filter((d) => d.state === 'done' && d.current !== null);
   let furthest: WeeklySummary['furthest'] = null;
   let achieved = 0;
   for (const d of done) {
     const v = d.current as number;
-    if (v >= s.band.lo && v <= s.band.hi) {
+    if (v >= d.target * (1 - BAND) && v <= d.target * (1 + BAND)) {
       achieved++;
       continue;
     }
-    const diff = v - s.target;
+    const diff = v - d.target;
     if (!furthest || Math.abs(diff) > Math.abs(furthest.diff)) furthest = { index: d.index, diff };
   }
   return { completed: done.length, achieved, furthest };

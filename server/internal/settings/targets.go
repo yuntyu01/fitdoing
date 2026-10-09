@@ -2,8 +2,7 @@ package settings
 
 import "github.com/yuntyu01/fitdoing/server/internal/platform"
 
-// MinKcal is the floor for the daily target. Age and sex are not collected, so BMR is unknown
-// and the floor is a fixed value.
+// MinKcal is the floor for the daily target (app policy).
 const MinKcal = 1200
 
 const fatRatio = 0.25
@@ -17,7 +16,8 @@ type Targets struct {
 
 func ClampKcal(kcal float64) int { return max(MinKcal, round(kcal)) }
 
-// Recommend sets default targets from goal and weight.
+// Recommend is the legacy weight-based default (before 2026-10): the placeholder target of new settings and the
+// answer to legacy recommend requests. It is not derived from the user's body, see RecommendEER.
 func Recommend(goal Goal, weightKg float64) Targets {
 	kcal := ClampKcal(float64(round(weightKg*goal.kcalPerKg()/50.0) * 50))
 	return MacrosFor(kcal, round(weightKg*goal.proteinPerKg()))
@@ -40,8 +40,8 @@ func (t Targets) PerMeal(mealCount int) Targets {
 // ParseGoal validates the `goal` query parameter.
 func ParseGoal(s string) (Goal, error) {
 	switch g := Goal(s); g {
-	case GoalLose, GoalKeep, GoalGain:
+	case GoalLose, GoalKeep, GoalGain, GoalBulk:
 		return g, nil
 	}
-	return "", platform.BadRequest("INVALID", "goal은 lose, keep, gain 중 하나예요")
+	return "", platform.BadRequest("INVALID", "goal은 lose, keep, gain, bulk 중 하나예요")
 }

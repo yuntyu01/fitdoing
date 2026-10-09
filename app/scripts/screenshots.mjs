@@ -26,9 +26,10 @@ const DIST = path.join(ROOT, 'node_modules', '.cache', 'fitdoing-web');
 const args = process.argv.slice(2);
 const urlArg = args.indexOf('--url') >= 0 ? args[args.indexOf('--url') + 1] : null;
 const noBuild = args.includes('--no-build');
-// --dark: 다크 모드로 찍는다. --width=360: 폭을 바꾼다. --out=<폴더>: docs/screenshots 대신 다른 곳에 쓴다.
+// --dark: 다크 모드로 찍는다. --width=360 · --height=568: 크기를 바꾼다. --out=<폴더>: docs/screenshots 대신 다른 곳에 쓴다.
 const dark = args.includes('--dark');
 const widthArg = Number(args.find((a) => a.startsWith('--width='))?.slice(8)) || null;
+const heightArg = Number(args.find((a) => a.startsWith('--height='))?.slice(9)) || null;
 const outArg = args.find((a) => a.startsWith('--out='))?.slice(6) ?? null;
 const OUT = outArg ? path.resolve(outArg) : OUT_DEFAULT;
 const only = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--url');
@@ -92,7 +93,7 @@ function serve() {
 async function shoot(browser, base, s) {
   const fresh = s.mode === 'fresh';
   const context = await browser.newContext({
-    viewport: widthArg ? { ...VIEWPORT, width: widthArg } : VIEWPORT,
+    viewport: { width: widthArg ?? VIEWPORT.width, height: heightArg ?? VIEWPORT.height },
     colorScheme: dark ? 'dark' : 'light',
     deviceScaleFactor: SCALE,
     isMobile: true,

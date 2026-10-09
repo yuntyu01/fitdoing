@@ -85,3 +85,24 @@ describe('weeklySummary', () => {
     expect(weeklySummary(weeklySeries([], 'kcal', 1600, NOW))).toEqual({ completed: 0, achieved: 0, furthest: null });
   });
 });
+
+describe('날짜별 목표', () => {
+  // 목요일(2026-09-24)부터 목표를 1600 → 2000 으로 바꿨다
+  const targetOn = (date: string) => (date >= '2026-09-24' ? 2000 : 1600);
+  const rows = [row('2026-09-23', 1600), row('2026-09-24', 2000)];
+  const s = weeklySeries(rows, 'kcal', targetOn, NOW);
+
+  it('지난 날은 그날 목표로 판단한다', () => {
+    expect(s.days[2].target).toBe(1600);
+    expect(s.days[3].target).toBe(2000);
+    expect(weeklySummary(s)).toEqual({ completed: 2, achieved: 2, furthest: null });
+  });
+
+  it('점선은 오늘 목표', () => {
+    expect(s.target).toBe(2000);
+  });
+
+  it('지금 목표 하나로만 보면 수요일이 범위 밖이 된다(이력 없을 때의 예전 동작)', () => {
+    expect(weeklySummary(weeklySeries(rows, 'kcal', 2000, NOW)).achieved).toBe(1);
+  });
+});

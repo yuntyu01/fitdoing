@@ -140,10 +140,12 @@ interface StepperProps {
   onChange: (v: number) => void;
   /** 가운데 값 글자 ("주 5회") */
   label: string;
+  /** 한 번 누를 때 바뀌는 양 (기본 1) */
+  step?: number;
 }
 
 /** − 값 + 작은 조절기. 끝에 닿으면 그쪽 버튼을 흐리게 막는다. */
-export function Stepper({ value, min, max, onChange, label }: StepperProps) {
+export function Stepper({ value, min, max, onChange, label, step: unit = 1 }: StepperProps) {
   const c = usePalette();
   const styles = useThemedStyles(makeStyles);
   const step = (d: number) => onChange(Math.min(max, Math.max(min, value + d)));
@@ -166,9 +168,9 @@ export function Stepper({ value, min, max, onChange, label }: StepperProps) {
   };
   return (
     <View style={styles.stepper} accessibilityRole="adjustable" accessibilityValue={{ text: label }}>
-      {btn(-1)}
+      {btn(-unit)}
       <Text style={styles.stepValue}>{label}</Text>
-      {btn(1)}
+      {btn(unit)}
     </View>
   );
 }

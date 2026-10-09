@@ -2,6 +2,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"math"
 	"regexp"
 	"slices"
@@ -40,11 +41,12 @@ type Goal string
 const (
 	GoalLose Goal = "lose"
 	GoalKeep Goal = "keep"
-	GoalGain Goal = "gain"
+	GoalGain Goal = "gain" // lean bulk (a small surplus); the value of the old "gain" goal
+	GoalBulk Goal = "bulk" // bulk (a larger surplus), added 2026-10
 )
 
 func (g *Goal) UnmarshalJSON(b []byte) error {
-	s, err := platform.EnumJSON(b, "lose", "keep", "gain")
+	s, err := platform.EnumJSON(b, "lose", "keep", "gain", "bulk")
 	*g = Goal(s)
 	return err
 }
@@ -53,7 +55,7 @@ func (g Goal) kcalPerKg() float64 {
 	switch g {
 	case GoalLose:
 		return 25
-	case GoalGain:
+	case GoalGain, GoalBulk:
 		return 35
 	}
 	return 30
@@ -63,7 +65,7 @@ func (g Goal) proteinPerKg() float64 {
 	switch g {
 	case GoalLose:
 		return 2.0
-	case GoalGain:
+	case GoalGain, GoalBulk:
 		return 1.8
 	}
 	return 1.6
@@ -121,6 +123,30 @@ type Settings struct {
 	ThemeMode     string `json:"themeMode"`     // system | light | dark
 	Notifications *bool  `json:"notifications"` // deadline reminders on/off (absent = on)
 	ShareFriends  bool   `json:"shareFriends"`  // new meals are shared with friends by default
+
+	// Added 2026-10 (nutrition targets). Opt: an older app leaves them out and the stored value is kept;
+	// null means "unknown" (never filled with a guessed default).
+	Sex           Opt[Sex]             `json:"sex"`
+	Age           Opt[int]             `json:"age"`
+	Activity      Opt[Activity]        `json:"activity"`
+	ActivityInput Opt[json.RawMessage] `json:"activityInput"` // daily activity and exercise the user described
+	Nutrition     Opt[json.RawMessage] `json:"nutrition"`     // calculation inputs (mode, ratios, versions); targets are the result
+	TargetHistory Opt[[]TargetEntry]   `json:"targetHistory"` // targets per date
+	FoodStyle     Opt[json.RawMessage] `json:"foodStyle"`     // food choice (vegetarian, ...), stored only
+	Allergies     Opt[[]string]        `json:"allergies"`     // separate from food style, stored only
+	Fasting       Opt[json.RawMessage] `json:"fasting"`       // eating window (structure only)
+}
+
+// Merge keeps the stored value of every newer field the request left out (an older app's save).
+func (s *Settings) Merge(stored Settings) {
+	s.Sex = s.Sex.or(stored.Sex)
+	s.Age = s.Age.or(stored.Age)
+	s.Activity = s.Activity.or(stored.Activity)
+	s.ActivityInput = s.ActivityInput.or(stored.ActivityInput)
+	s.Nutrition = s.Nutrition.or(stored.Nutrition)
+	s.FoodStyle = s.FoodStyle.or(stored.FoodStyle)
+	s.Allergies = s.Allergies.or(stored.Allergies)
+	s.Fasting = s.Fasting.or(stored.Fasting)
 }
 
 // ThemeModes are the allowed themeMode values.
@@ -189,10 +215,40 @@ func (s *Settings) Validate() error {
 		return platform.Invalid("lockMinutes", "10~720 사이여야 해요")
 	case !between(s.EmergencyPerWeek, 0, 7):
 		return platform.Invalid("emergencyPerWeek", "0~7 사이여야 해요")
+	case s.Age.Val != nil && !between(*s.Age.Val, AgeMin, AgeMax):
+		return platform.Invalid("age", "10~100 사이여야 해요")
+	case s.Allergies.Val != nil && len(*s.Allergies.Val) > 10:
+		return platform.Invalid("allergies", "10개 이하여야 해요")
 	case len([]rune(s.Nickname)) > 20:
 		return platform.Invalid("nickname", "20자 이하여야 해요")
 	case s.ThemeMode != "" && !slices.Contains(ThemeModes, s.ThemeMode):
 		return platform.Invalid("themeMode", "system, light, dark 중 하나예요")
+	}
+	for _, c := range []struct {
+		field string
+		raw   *json.RawMessage
+		check func(map[string]any) bool
+	}{
+		{"activityInput", s.ActivityInput.Val, nil},
+		{"nutrition", s.Nutrition.Val, validNutrition},
+		{"foodStyle", s.FoodStyle.Val, validFoodStyle},
+		{"fasting", s.Fasting.Val, validFasting},
+	} {
+		if err := checkObject(c.field, c.raw, c.check); err != nil {
+			return err
+		}
+	}
+	if s.Allergies.Val != nil {
+		for _, a := range *s.Allergies.Val {
+			if len([]rune(a)) > 30 {
+				return platform.Invalid("allergies", "30자 이하여야 해요")
+			}
+		}
+	}
+	if s.TargetHistory.Val != nil {
+		if err := validateHistory(*s.TargetHistory.Val); err != nil {
+			return err
+		}
 	}
 	for _, m := range s.Meals {
 		if !between(m.Index, 1, 6) {
@@ -253,7 +309,7 @@ type Row struct {
 	Mode             string         `gorm:"column:mode;size:8;not null;check:ck_user_settings_mode,mode IN ('mild','normal','spicy')"`
 	PendingMode      *string        `gorm:"column:pending_mode;size:8;check:ck_user_settings_pending,pending_mode IN ('mild','normal','spicy')"`
 	PendingFrom      *platform.Date `gorm:"column:pending_from;size:10"`
-	Goal             string         `gorm:"column:goal;size:8;not null;check:ck_user_settings_goal,goal IN ('lose','keep','gain')"`
+	Goal             string         `gorm:"column:goal;size:8;not null;check:ck_user_settings_goal_v2,goal IN ('lose','keep','gain','bulk')"`
 	HeightCm         int            `gorm:"column:height_cm;not null"`
 	WeightKg         float64        `gorm:"column:weight_kg;not null"`
 	LockMinutes      int            `gorm:"column:lock_minutes;not null"`
@@ -280,7 +336,13 @@ type Row struct {
 	ThemeMode        string         `gorm:"column:theme_mode;size:8;not null;default:'system'"`
 	Notifications    bool           `gorm:"column:notifications;not null;default:true"`
 	ShareFriends     bool           `gorm:"column:share_friends;not null;default:false"`
-	UpdatedAt        time.Time      `gorm:"column:updated_at;not null"`
+	// Added 2026-10: nullable, unknown until the user enters them (rows of older apps stay NULL).
+	Sex      *string `gorm:"column:sex;size:8;check:ck_user_settings_sex,sex IN ('male','female')"`
+	Age      *int    `gorm:"column:age"`
+	Activity *string `gorm:"column:activity;size:12;check:ck_user_settings_activity,activity IN ('sedentary','low','active','veryActive')"`
+	// Inputs JSON: {activityInput, nutrition, foodStyle, allergies, fasting}. The targets columns are the result.
+	Inputs    *string   `gorm:"column:inputs;type:text"`
+	UpdatedAt time.Time `gorm:"column:updated_at;not null"`
 
 	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 }
@@ -319,5 +381,19 @@ type AppRow struct {
 
 func (AppRow) TableName() string { return "allowed_apps" }
 
+// HistoryRow is the targets that applied from a date on (table target_history).
+type HistoryRow struct {
+	UserID   string        `gorm:"column:user_id;primaryKey;size:64"`
+	FromDate platform.Date `gorm:"column:from_date;primaryKey;size:10"`
+	Kcal     int           `gorm:"column:kcal;not null"`
+	Carbs    int           `gorm:"column:carbs;not null"`
+	Protein  int           `gorm:"column:protein;not null"`
+	Fat      int           `gorm:"column:fat;not null"`
+
+	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+}
+
+func (HistoryRow) TableName() string { return "target_history" }
+
 // Models lists the tables of this package for AutoMigrate (parents first).
-func Models() []any { return []any{&Row{}, &SlotRow{}, &DayRow{}, &AppRow{}} }
+func Models() []any { return []any{&Row{}, &SlotRow{}, &DayRow{}, &AppRow{}, &HistoryRow{}} }

@@ -47,7 +47,7 @@ export default function TodayScreen() {
         <View style={styles.cards}>
           <TotalsCard totals={data.totals} targets={settings.targets} loggedCount={data.loggedCount} />
           <MealTable data={data} targets={settings.targets} />
-          <WeeklyCard rows={weeklyRows} targets={settings.targets} now={now} />
+          <WeeklyCard rows={weeklyRows} targets={settings.targets} history={settings.targetHistory} now={now} />
         </View>
       </ScrollView>
       <CameraFab urgent={urgent} bottom={tabSpace} />

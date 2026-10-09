@@ -77,7 +77,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | GET/PUT `/api/settings` | 설정. 강도를 낮추면 다음 주 월요일부터 적용(`pendingMode`/`pendingFrom`), 목표 칼로리 1200 미만 `TARGET_BELOW_MINIMUM`. 목표 칼로리·탄단지는 1200 이상이면 직접 정한 값 그대로 저장 |
 | POST `/api/auth/login` | `{provider, token}` → `{token, userId, isNew}` (공개) |
 | DELETE `/api/account` | 회원 탈퇴: 계정과 모든 기록 삭제, 204 |
-| GET `/api/targets/recommend?goal=&weightKg=` | 목표 칼로리·탄단지 추천 (로그인 불필요) |
+| GET `/api/targets/recommend?goal=&weightKg=[&heightCm=&age=&sex=&activity=&mode=]` | 목표 추천 (로그인 불필요). 구형 요청(goal·weightKg만)은 예전 체중 기반 값 그대로, 신체 정보를 함께 보내면 2025 KDRI 성인 EER 기반(유지 추정 `maintenanceKcal`과 목표 분리). docs/nutrition-targets.md |
 | POST `/api/meals/analyze` (multipart `photo`) | 음식 인식 (로그인 필요, 유료 호출) |
 | POST/GET/DELETE `/api/meals` | 끼니 기록(같은 끼니는 덮어쓰기, portion 0.25/0.5/1/1.5/2, 열린 끼니 잠금 해제) |
 | GET `/api/today?date=&time=` | 홈: 합계·식단 표·연속 기록·헬스 주간·쿠폰. `time`(폰 현지 `HH:mm`, 선택)을 주면 마감이 지난 미기록 끼니는 `missed`, 남은 끼니 `target`은 오늘 남은 양 ÷ 남은 끼니 수 |

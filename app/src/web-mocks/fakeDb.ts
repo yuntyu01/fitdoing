@@ -11,6 +11,10 @@ const at = (h: number, m: number) => new Date(2026, 8, 26, h, m).getTime();
 export const seedSettings: Settings = {
   mode: 'normal',
   goal: 'keep',
+  sex: null,
+  age: null,
+  activity: null,
+  activityInput: null,
   heightCm: 175,
   weightKg: 70,
   meals: resizeMeals([], 4),
@@ -28,6 +32,8 @@ export const seedSettings: Settings = {
   sleep: { enabled: true, bedTime: '23:30', wakeTime: '07:00' },
   coupons: { rest: 2, cheat: 2 },
   targets: { kcal: 1600, carbs: 180, protein: 100, fat: 53 },
+  nutrition: null,
+  targetHistory: [],
   allowedApps: [],
   lockMinutes: 120,
   emergencyPerWeek: 2,
@@ -36,6 +42,9 @@ export const seedSettings: Settings = {
   themeMode: 'system',
   notifications: true,
   shareFriends: false,
+  foodStyle: { pattern: 'general', eggs: true, dairy: true },
+  allergies: [],
+  fasting: null,
 };
 
 type SeedFood = { name: string; amount: string; kcal: number; carbs: number; protein: number; fat: number };

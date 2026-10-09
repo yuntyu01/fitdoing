@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { clampWeeklyTarget } from '../../domain/stats';
 import { useOnboardingDraft } from '../../features/onboarding/draft';
+import { ONBOARDING_STEPS } from '../../features/onboarding/flow';
 import { FormNote } from '../../features/settings/editors/Form';
 import { GymEditor, SleepEditor } from '../../features/settings/editors/RoutineEditors';
 import { FullButton } from '../../ui/FullButton';
@@ -20,7 +21,7 @@ export default function RoutineStep() {
 
   return (
     <Screen
-      header={<StepHeader step={3} total={4} onBack={() => router.back()} />}
+      header={<StepHeader step={6} total={ONBOARDING_STEPS} onBack={() => router.back()} />}
       title={t('onboarding.routineTitle')}
       footer={
         <FullButton

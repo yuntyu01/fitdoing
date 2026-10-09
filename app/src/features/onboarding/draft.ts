@@ -1,36 +1,22 @@
 import { create } from 'zustand';
 
 import type { Settings } from '../../db/schema';
-import { defaultTargets } from '../../domain/targets';
 import { initialSettings } from '../settings/defaults';
-import type { ProfileDraft } from '../settings/editors/ProfileEditor';
+import { cleanNickname } from '../settings/editors/ProfileEditor';
+
+// 온보딩에서 모으는 설정. 신체·목표·활동·영양 목표는 features/nutrition/form 의 입력 상태로 받고,
+// 결과 확인 단계에서 적용(appliedSettings)한 값이 여기 settings 에 들어온다.
 
 interface DraftState {
   settings: Settings;
-  profile: ProfileDraft;
   set: (patch: Partial<Settings>) => void;
-  setProfile: (p: ProfileDraft) => void;
-  /** 입력한 목표·몸무게로 기본 목표 칼로리를 채운 최종 설정 */
+  setAll: (next: Settings) => void;
   finalize: () => Settings;
 }
 
-const init = initialSettings();
-
 export const useOnboardingDraft = create<DraftState>((set, get) => ({
-  settings: init,
-  profile: { goal: init.goal, height: String(init.heightCm), weight: String(init.weightKg) },
+  settings: initialSettings(),
   set: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
-  setProfile: (profile) => set({ profile }),
-  finalize: () => {
-    const { settings, profile } = get();
-    const heightCm = Number(profile.height);
-    const weightKg = Number(profile.weight);
-    return {
-      ...settings,
-      goal: profile.goal,
-      heightCm,
-      weightKg,
-      targets: defaultTargets(profile.goal, weightKg),
-    };
-  },
+  setAll: (settings) => set({ settings }),
+  finalize: () => ({ ...get().settings, nickname: cleanNickname(get().settings.nickname) }),
 }));

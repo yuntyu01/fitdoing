@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatNumber, roundGram, roundKcal } from '../../domain/format';
-import type { Targets } from '../../domain/targets';
+import { targetsOn, type TargetEntry, type Targets } from '../../domain/targets';
 import { addDays, parseDateKey } from '../../domain/time';
 import { WEEKLY_METRICS, weeklySeries, weeklySummary, type WeeklyMetric, type WeeklyRow } from '../../domain/weekly';
 import { useThemedStyles, type Palette } from '../../ui/theme';
@@ -28,7 +28,18 @@ const LABEL_KEY = { kcal: 'home.kcalLabel', protein: 'home.protein', carbs: 'hom
  * 홈 맨 아래 주간 그래프: 요일마다 지난주·이번 주 막대를 나란히, 이번 주 값은 막대 위에 적고 목표는 점선.
  * 아래에 영양소 탭과 한 줄 피드백(목표에서 가장 벗어난 날, 이번 주·지난주 평균).
  */
-export function WeeklyCard({ rows, targets, now }: { rows: WeeklyRow[]; targets: Targets; now: Date }) {
+export function WeeklyCard({
+  rows,
+  targets,
+  history,
+  now,
+}: {
+  rows: WeeklyRow[];
+  targets: Targets;
+  /** 날짜별 목표. 지난 날은 그날 목표로 본다. */
+  history: TargetEntry[];
+  now: Date;
+}) {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const [metric, setMetric] = useState<WeeklyMetric>('kcal');
@@ -36,8 +47,10 @@ export function WeeklyCard({ rows, targets, now }: { rows: WeeklyRow[]; targets:
   const unit = kcal ? t('common.kcal') : t('common.gram');
   const withUnit = (v: string) => (kcal ? `${v} ${unit}` : `${v}${unit}`);
   const round = kcal ? roundKcal : roundGram;
-  const target = targets[TARGET_KEY[metric]];
-  const s = useMemo(() => weeklySeries(rows, metric, target, now), [rows, metric, target, now]);
+  const s = useMemo(
+    () => weeklySeries(rows, metric, (date) => targetsOn(history, targets, date)[TARGET_KEY[metric]], now),
+    [rows, metric, history, targets, now],
+  );
   const sum = useMemo(() => weeklySummary(s), [s]);
   const fmt = (v: number | null) => (v === null ? '-' : formatNumber(round(v)));
   const h = (v: number) => Math.max(2, (v / s.max) * CHART_H);

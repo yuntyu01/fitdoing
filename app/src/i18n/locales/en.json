@@ -21,9 +21,200 @@
   "weekdayShort": { "0": "Mon", "1": "Tue", "2": "Wed", "3": "Thu", "4": "Fri", "5": "Sat", "6": "Sun" },
   "weekdayLong": { "0": "Monday", "1": "Tuesday", "2": "Wednesday", "3": "Thursday", "4": "Friday", "5": "Saturday", "6": "Sunday" },
   "date": { "full": "{{weekday}}, {{month}}/{{day}}" },
-  "goal": { "lose": "Lose", "keep": "Keep", "gain": "Gain" },
+  "goal": { "lose": "Lose", "keep": "Keep", "gain": "Lean bulk", "bulk": "Bulk" },
+  "goalDesc": {
+    "lose": "Eat below your maintenance estimate",
+    "keep": "Hold your current weight",
+    "gain": "Eat a little above maintenance",
+    "bulk": "Eat well above maintenance"
+  },
+  "sex": {
+    "male": "Male",
+    "female": "Female",
+    "unset": "Not set"
+  },
+  "activity": {
+    "sedentary": "Sedentary",
+    "low": "Low active",
+    "active": "Active",
+    "veryActive": "Very active"
+  },
+  "activityDesc": {
+    "sedentary": "Mostly sitting, no exercise",
+    "low": "Daily life plus some light walking or exercise (most Korean adults)",
+    "active": "Quite a lot of walking or exercise each day",
+    "veryActive": "Long hours of hard training or physical work"
+  },
+  "macro": {
+    "carbs": "Carbs",
+    "protein": "Protein",
+    "fat": "Fat"
+  },
+  "ratio": {
+    "r532": "5 : 3 : 2",
+    "r433": "4 : 3 : 3"
+  },
+  "foodStyle": {
+    "screenDesc": "Saves how you choose food. It is separate from your nutrition targets and is not used for food suggestions or ingredient checks yet.",
+    "title": "Food style",
+    "more": "Other styles",
+    "pattern": {
+      "general": "General",
+      "vegetarian": "Vegetarian",
+      "vegan": "Vegan",
+      "mediterranean": "Mediterranean",
+      "carnivore": "Carnivore"
+    },
+    "desc": {
+      "general": "No food restrictions",
+      "vegetarian": "No meat or fish. Set eggs and dairy below",
+      "vegan": "No animal products",
+      "mediterranean": "Vegetables, beans, whole grains, fish, olive oil",
+      "carnivore": "Mostly animal foods. Macros follow your nutrition target mode"
+    },
+    "allowTitle": "I eat",
+    "eggs": "Eggs",
+    "dairy": "Milk and dairy",
+    "allergyTitle": "Allergies",
+    "allergyPlaceholder": "e.g. peanut, shrimp (comma separated)",
+    "allergyNote": "Saved separately from food style. For your records only; photos are not checked for allergens."
+  },
+  "nutrition": {
+    "title": "Nutrition targets",
+    "step1": "Body and goal",
+    "step2": "Daily activity and exercise",
+    "step2Desc": "Describe your day, then pick your activity level yourself.",
+    "step3": "How to calculate",
+    "step4": "Review",
+    "step4Desc": "Check the maintenance estimate and the target, then apply. Your current target stays until you apply.",
+    "apply": "Apply this target",
+    "seeResult": "See result",
+    "bodyNote": "Leave sex or age empty and only custom targets are available.",
+    "scopeTitle": "Who the auto calculation is for",
+    "scopeNote": "The automatic calculation is for adults 19 and over. If any of these apply, or you are under 19, the general adult calculation is not used and only custom targets open. Set targets with your care team.",
+    "special": {
+      "pregnant": "Pregnant",
+      "lactating": "Breastfeeding",
+      "medicalDiet": "On a diet for treating a condition"
+    },
+    "dailyTitle": "Usual day",
+    "daily": {
+      "sitting": "Mostly sitting",
+      "standing": "Standing a lot",
+      "walking": "Walking a lot",
+      "manual": "Physical work"
+    },
+    "exerciseTitle": "Exercise",
+    "exercise": {
+      "none": "None",
+      "strength": "Strength",
+      "cardio": "Cardio",
+      "mixed": "Strength + cardio",
+      "sports": "Sports / other"
+    },
+    "perWeek": "Times a week",
+    "perWeekValue": "{{n}}x / week",
+    "minutes": "Each session",
+    "minuteUnit": "min",
+    "intensity": "Intensity",
+    "intensityLevel": {
+      "light": "Light",
+      "moderate": "Moderate",
+      "vigorous": "Vigorous"
+    },
+    "levelTitle": "Confirm activity level",
+    "levelNote": "Use the above as a guide and pick for your whole day including exercise. There is no validated rule that sets the level from workout counts, so the app does not pick it for you. Because your exercise is in this level, its calories are not added to your meal target again.",
+    "levelMeta": "PAL {{pal}} · coefficient {{pa}}",
+    "modeTitle": "Nutrition target",
+    "modeBlocked": "The automatic calculation does not apply, so only custom targets are available.",
+    "mode": {
+      "balanced": "Balanced",
+      "training": "Training",
+      "custom": "Custom"
+    },
+    "modeDesc": {
+      "balanced": "Split by share of calories. Starts at carbs 55 · protein 20 · fat 25%",
+      "training": "Set protein by body weight (g/kg) first, then split the rest",
+      "custom": "Set the ratio or grams yourself"
+    },
+    "adjustTitle": "Goal adjustment",
+    "adjustNote": "The app's starting value for {{goal}} is {{start}}. It is an app policy, not an official recommendation, and you can change it.",
+    "balancedTitle": "Share of calories",
+    "balancedNote": "A starting point picked by the app, not the one official ratio.",
+    "trainingTitle": "Protein and fat",
+    "trainingNote": "Starting values are app choices (lose 2.0 · keep 1.6 · lean bulk/bulk 1.8 g/kg, fat 25%). For reference, ISSN (2017) gives 1.4–2.0 g/kg/day for most exercising people. Carbs fill the remaining calories.",
+    "proteinPerKg": "Protein",
+    "fatPct": "Fat",
+    "customTitle": "Custom",
+    "customKind": {
+      "ratio": "Ratio",
+      "fixKcal": "kcal + 2",
+      "grams": "3 grams"
+    },
+    "customDesc": {
+      "ratio": "Set calories and the carb/protein/fat share (total 100%). Shares are of calories, not weight.",
+      "fixKcal": "Set calories and two nutrients; the third is calculated.",
+      "grams": "Set carb/protein/fat grams; total calories are calculated."
+    },
+    "solveTitle": "Nutrient to calculate",
+    "ratioSum": "Total {{sum}}%",
+    "advancedTitle": "Advanced diet options",
+    "advancedNote": "Diets that limit carbs. Set a carb target; protein follows the mode and the remaining calories go to fat. Starting values are app choices, not universal standards.",
+    "carb": {
+      "none": "Off",
+      "lowCarb": "Low carb",
+      "lchf": "Low carb, high fat",
+      "keto": "Keto"
+    },
+    "carbDesc": {
+      "lowCarb": "Starts at 40% carbs. For reference, ADA (2019) describes low carb as 26–45% of calories",
+      "lchf": "Starts at 20% carbs. Fewer carbs, more fat",
+      "keto": "Set in grams of total carbs only. Starts at 50 g"
+    },
+    "carbByPct": "% of calories",
+    "carbByGrams": "Grams a day",
+    "carbTarget": "Carb target",
+    "ketoTarget": "Total carb target",
+    "ketoNote": "Logged carbs are total carbs estimated from photos. There is no fiber data, so net carbs are not calculated, and logs cannot tell whether you are in ketosis.",
+    "resultError": "Can't calculate",
+    "kcalTitle": "Calories",
+    "maintenance": "Maintenance estimate",
+    "maintenanceDesc": "{{level}} · coefficient {{pa}}",
+    "adjusted": "Goal adjustment {{adj}}",
+    "adjustedStart": "App starting value",
+    "adjustedEdited": "Changed by you",
+    "target": "Target calories",
+    "targetDesc": "Rounded to 50 kcal",
+    "noExerciseAdd": "Maintenance uses the 2025 Korean DRI adult energy requirement equation. Your usual exercise is in the activity level you picked, so its calories are not added again.",
+    "maintenanceRef": "For reference: maintenance estimate",
+    "customKcalNote": "Calories you set yourself, separate from the maintenance estimate.",
+    "macroTitle": "Macros",
+    "macroNote": "Split by share of calories. Grams are rounded to whole numbers when applied.",
+    "perKg": "{{v}} g per kg body weight",
+    "amdrTitle": "Reference range",
+    "amdrRange": "The 2025 Korean DRI acceptable range for adults is carbs {{c}}%, protein {{p}}%, fat {{f}}%. It is a general adult reference and training targets can differ.",
+    "amdrOutside": "{{names}} is outside this reference range. You can still save it.",
+    "compareTitle": "Target change",
+    "compareFirst": "This is your first target.",
+    "block": {
+      "missingSex": "Sex is not set, so maintenance can't be estimated. Use custom or set sex in step 1.",
+      "missingAge": "Age is not set, so maintenance can't be estimated.",
+      "missingActivity": "Activity level is not picked, so maintenance can't be estimated.",
+      "minor": "The adult calculation is not used under 19. Only custom targets are available.",
+      "special": "The general adult calculation is not used during pregnancy, breastfeeding or a treatment diet. Only custom targets are available."
+    },
+    "err": {
+      "ratioSum": "Make the ratio add up to 100%.",
+      "negative": "Not enough calories left, so {{macro}} goes below zero. Change the targets or calories.",
+      "belowMin": "Target calories are below {{min}} kcal. Change the adjustment or inputs.",
+      "carbOverKcal": "The carb target is larger than total calories.",
+      "invalid": "Some fields are empty or not numbers."
+    }
+  },
   "onboarding": {
     "goalTitle": "What's your goal?",
+    "age": "Age",
+    "ageUnit": "yrs",
     "height": "Height",
     "weight": "Current weight",
     "cm": "cm",
@@ -56,6 +247,7 @@
     "nicknameOptional": "Nickname (optional)"
   },
   "edit": {
+    "profileTargetsNote": "Changing goal or body info keeps your nutrition targets. To recalculate, apply them again from Nutrition targets in settings.",
     "save": "Save",
     "goal": "Goal",
     "body": "Body",
@@ -125,6 +317,7 @@
   "weekly": {"title": "Weekly", "avg": "Weekly avg", "target": "Goal", "lastWeek": "Last week", "thisWeek": "This week", "band": "Goal range ±10%", "range": "{{from}} - {{to}}", "achieved": "{{m}} of {{n}} finished days on target", "noneDone": "No finished days yet", "inProgress": "Today", "under": "{{day}}: {{metric}} {{n}}{{unit}} under target", "over": "{{day}}: {{metric}} {{n}}{{unit}} over target", "allIn": "Every finished day was within the target range", "waiting": "Feedback appears once a few days are logged", "avgLine": "This week avg {{avg}} · last week {{last}}"},
   "sync": { "title": "Server sync", "never": "Not yet", "last": "{{time}}", "pending": "{{n}} waiting" },
   "settings": {
+    "foodStyle": "Food style",
     "sectionPlan": "My plan",
     "sectionApp": "App",
     "mealsPerDay": "{{n}} meals a day",
@@ -145,7 +338,7 @@
     "modeSpicyDesc": "Protein goal, cheat coupons, random photo checks",
     "meals": "Meals · Deadlines",
     "mealsValue": "{{n}} meals",
-    "targets": "Calories · Macros",
+    "targets": "Nutrition targets",
     "gym": "Gym",
     "sleep": "Bedtime · Wake up",
     "profile": "Goal · Height · Weight",

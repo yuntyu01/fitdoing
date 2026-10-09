@@ -32,6 +32,35 @@ async function openByText(page, text) {
   }
 }
 
+// 웹 스택은 지나온 화면도 DOM 에 남겨 두므로 마지막(지금 화면) 요소를 고른다
+async function tap(page, text) {
+  const el = page.getByText(text, { exact: true }).last();
+  await el.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await el.click();
+  await page.waitForTimeout(300);
+}
+
+async function fill(page, label, value) {
+  await page.getByLabel(label, { exact: true }).last().fill(value);
+  await page.waitForTimeout(100);
+}
+
+/** 영양 목표 1단계에서 n단계까지: 남성 · 40세 · 172cm · 70kg → 저활동적 → 일반 균형 */
+async function nutritionTo(page, n) {
+  await tap(page, '남성');
+  await fill(page, '만 나이', '40');
+  await fill(page, '키', '172');
+  await fill(page, '현재 체중', '70');
+  await tap(page, '다음');
+  if (n === 2) return;
+  await tap(page, '주로 앉아 있어요');
+  await tap(page, '근력 운동');
+  await tap(page, '저활동적');
+  await tap(page, '다음');
+  if (n === 3) return;
+  await tap(page, '결과 보기');
+}
+
 export const SCREENS = [
   { route: '/', name: 'home' },
   {
@@ -53,15 +82,38 @@ export const SCREENS = [
   { route: '/settings', name: 'coupon-sheet', actions: (page) => openByText(page, '쿠폰') },
   { route: '/login', name: 'login', mode: 'loggedOut' },
   { route: '/onboarding', name: 'onboarding-1-goal', mode: 'fresh' },
-  { route: '/onboarding/meals', name: 'onboarding-2-meals', mode: 'fresh' },
-  { route: '/onboarding/routine', name: 'onboarding-3-routine', mode: 'fresh' },
-  { route: '/onboarding/permissions', name: 'onboarding-4-permissions', mode: 'fresh' },
+  { route: '/onboarding/meals', name: 'onboarding-5-meals', mode: 'fresh' },
+  { route: '/onboarding/routine', name: 'onboarding-6-routine', mode: 'fresh' },
+  { route: '/onboarding/permissions', name: 'onboarding-7-permissions', mode: 'fresh' },
   { route: '/edit/profile', name: 'edit-profile' },
   { route: '/edit/meals', name: 'edit-meals' },
   { route: '/edit/gym', name: 'edit-gym' },
   { route: '/edit/sleep', name: 'edit-sleep' },
   { route: '/edit/mode', name: 'edit-mode' },
-  { route: '/edit/targets', name: 'edit-targets' },
+  // 영양 목표 4단계 (신체·목표 → 활동 → 계산 모드 → 결과). 2~4단계는 1단계에서 이어 들어가야 열린다.
+  { route: '/edit/nutrition', name: 'nutrition-1-body' },
+  { route: '/edit/nutrition', name: 'nutrition-2-activity', actions: (p) => nutritionTo(p, 2) },
+  { route: '/edit/nutrition', name: 'nutrition-3-plan', actions: (p) => nutritionTo(p, 3) },
+  {
+    route: '/edit/nutrition',
+    name: 'nutrition-3-plan-custom',
+    actions: async (p) => {
+      await nutritionTo(p, 3);
+      await tap(p, '직접 설정');
+    },
+  },
+  {
+    route: '/edit/nutrition',
+    name: 'nutrition-3-plan-advanced',
+    actions: async (p) => {
+      await nutritionTo(p, 3);
+      await tap(p, '운동 중심');
+      await tap(p, '고급 식단 설정');
+      await tap(p, '케토');
+    },
+  },
+  { route: '/edit/nutrition', name: 'nutrition-4-result', actions: (p) => nutritionTo(p, 4) },
+  { route: '/edit/food-style', name: 'edit-food-style' },
 
   { route: '/capture/review', name: 'review' },
   { route: '/capture/review', name: 'review-portion-sheet', actions: (page) => openByText(page, '100%') },

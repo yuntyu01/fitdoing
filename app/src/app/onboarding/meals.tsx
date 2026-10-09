@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useOnboardingDraft } from '../../features/onboarding/draft';
+import { ONBOARDING_STEPS } from '../../features/onboarding/flow';
 import { MealsEditor } from '../../features/settings/editors/MealsEditor';
 import { askToEnableNotifications } from '../../features/settings/notifications';
 import { FullButton } from '../../ui/FullButton';
@@ -22,7 +23,7 @@ export default function MealsStep() {
 
   return (
     <Screen
-      header={<StepHeader step={2} total={4} onBack={() => router.back()} />}
+      header={<StepHeader step={5} total={ONBOARDING_STEPS} onBack={() => router.back()} />}
       title={t('onboarding.mealsTitle')}
       footer={<FullButton label={t('common.next')} onPress={() => router.push('/onboarding/routine')} />}
     >

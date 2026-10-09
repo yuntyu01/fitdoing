@@ -120,7 +120,8 @@ func (s *Service) Today(userID string, date platform.Date, now string) (Today, e
 			rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline})
 		}
 	}
-	left := remainingPerMeal(*st.Targets, total, ahead)
+	targets := st.TargetsOn(date)
+	left := remainingPerMeal(targets, total, ahead)
 	for i := range rows {
 		if !rows[i].Logged && !rows[i].Missed {
 			t := left
@@ -139,7 +140,7 @@ func (s *Service) Today(userID string, date platform.Date, now string) (Today, e
 	if err != nil {
 		return Today{}, err
 	}
-	return Today{date, streak, len(logged), len(st.Meals), total, *st.Targets, rows, gymWeek, sum}, nil
+	return Today{date, streak, len(logged), len(st.Meals), total, targets, rows, gymWeek, sum}, nil
 }
 
 // streak counts consecutive logged days; with nothing logged today it counts back from yesterday.
@@ -272,7 +273,7 @@ func (s *Service) Day(userID string, date platform.Date) (DayCard, error) {
 	if err := s.db.Model(&lock.Event{}).Where("user_id = ? AND lock_date = ?", userID, date).Count(&locks).Error; err != nil {
 		return DayCard{}, err
 	}
-	card := DayCard{Date: date, Total: total, Targets: *st.Targets, Meals: list, Locked: locks > 0, LockCount: int(locks)}
+	card := DayCard{Date: date, Total: total, Targets: st.TargetsOn(date), Meals: list, Locked: locks > 0, LockCount: int(locks)}
 	if len(g) > 0 {
 		v := g[0].VerifiedBy
 		card.GymVerifiedBy = &v
@@ -316,14 +317,17 @@ type Furthest struct {
 	Diff  int `json:"diff"`
 }
 
-func weekSummary(days []WeekDay, target int, pick func(meal.Nutrition) int) WeekSummary {
-	lo := float64(target) * (1 - weeklyBandPct/100.0)
-	hi := float64(target) * (1 + weeklyBandPct/100.0)
+// weekSummary judges each done day against the target of that day (targetOn), so changing targets later
+// does not change past days.
+func weekSummary(days []WeekDay, targetOn func(platform.Date) int, pick func(meal.Nutrition) int) WeekSummary {
 	out := WeekSummary{}
 	for _, d := range days {
 		if d.State != "done" || d.Current == nil {
 			continue
 		}
+		target := targetOn(d.Date)
+		lo := float64(target) * (1 - weeklyBandPct/100.0)
+		hi := float64(target) * (1 + weeklyBandPct/100.0)
 		out.Completed++
 		v := pick(*d.Current)
 		if float64(v) >= lo && float64(v) <= hi {
@@ -408,12 +412,15 @@ func (s *Service) Weekly(userID string, date platform.Date) (Weekly, error) {
 		}
 		days = append(days, wd)
 	}
-	t := *st.Targets
+	t := st.TargetsOn(date)
+	on := func(pick func(settings.Targets) int) func(platform.Date) int {
+		return func(d platform.Date) int { return pick(st.TargetsOn(d)) }
+	}
 	summary := map[string]WeekSummary{
-		"kcal":    weekSummary(days, t.Kcal, func(n meal.Nutrition) int { return n.Kcal }),
-		"carbs":   weekSummary(days, t.Carbs, func(n meal.Nutrition) int { return n.Carbs }),
-		"protein": weekSummary(days, t.Protein, func(n meal.Nutrition) int { return n.Protein }),
-		"fat":     weekSummary(days, t.Fat, func(n meal.Nutrition) int { return n.Fat }),
+		"kcal":    weekSummary(days, on(func(t settings.Targets) int { return t.Kcal }), func(n meal.Nutrition) int { return n.Kcal }),
+		"carbs":   weekSummary(days, on(func(t settings.Targets) int { return t.Carbs }), func(n meal.Nutrition) int { return n.Carbs }),
+		"protein": weekSummary(days, on(func(t settings.Targets) int { return t.Protein }), func(n meal.Nutrition) int { return n.Protein }),
+		"fat":     weekSummary(days, on(func(t settings.Targets) int { return t.Fat }), func(n meal.Nutrition) int { return n.Fat }),
 	}
 	return Weekly{mon, days, meanNutrition(thisDone), meanNutrition(lastAll), t, weeklyBandPct, summary}, nil
 }

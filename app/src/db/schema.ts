@@ -1,17 +1,30 @@
 import { integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import type { MealSlot } from '../domain/meals';
-import type { Goal, Targets } from '../domain/targets';
+import type {
+  Activity,
+  ActivityInput,
+  FastingWindow,
+  FoodStyle,
+  NutritionSettings,
+  Sex,
+} from '../domain/nutrition';
+import type { Goal, TargetEntry, Targets } from '../domain/targets';
 
 // 날짜는 기기 로컬 기준 'YYYY-MM-DD', 시각은 epoch ms, 하루 중 시각은 'HH:mm'.
 
 export type Mode = 'mild' | 'normal' | 'spicy';
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type { Goal };
+export type { Activity, Goal, Sex };
 
 export interface Settings {
   mode: Mode;
   goal: Goal;
+  // 신체 정보. 모르면 null (예전 설정에는 없다) — 기본값을 실제 정보로 단정하지 않는다.
+  sex: Sex | null;
+  age: number | null; // 만 나이
+  activity: Activity | null; // 사용자가 확인한 KDRI 신체활동단계
+  activityInput: ActivityInput | null; // 단계를 고를 때 참고한 일상 활동·운동
   heightCm: number;
   weightKg: number;
   meals: MealSlot[];
@@ -28,7 +41,12 @@ export interface Settings {
   };
   sleep: { enabled: boolean; bedTime: string; wakeTime: string };
   coupons: { rest: number; cheat: number };
-  targets: Targets;
+  targets: Targets; // 적용한 최종 목표
+  nutrition: NutritionSettings | null; // 목표를 계산한 원본 입력. null 이면 예전 방식(직접 저장한 목표 그대로)
+  targetHistory: TargetEntry[]; // 날짜별 목표 (주간 그래프가 과거 날짜를 그때 목표로 본다)
+  foodStyle: FoodStyle; // 음식 선택 방식 (영양 목표와 별개, 저장만)
+  allergies: string[]; // 알레르기 (음식 선호와 별개, 저장만)
+  fasting: FastingWindow | null; // 간헐적 단식 먹는 시간 (구조만, 화면 없음)
   allowedApps: string[];
   lockMinutes: number;
   emergencyPerWeek: number;

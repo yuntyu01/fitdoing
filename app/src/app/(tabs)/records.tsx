@@ -120,7 +120,7 @@ function CalendarTab({ settings, now }: { settings: Settings; now: Date }) {
 /** 홈과 같은 주간 그래프 */
 function WeeklyTab({ settings, now }: { settings: Settings; now: Date }) {
   const rows = useWeeklyRows(now);
-  return <WeeklyCard rows={rows} targets={settings.targets} now={now} />;
+  return <WeeklyCard rows={rows} targets={settings.targets} history={settings.targetHistory} now={now} />;
 }
 
 const makeStyles = (c: Palette) =>

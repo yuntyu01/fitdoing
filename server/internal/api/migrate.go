@@ -59,5 +59,11 @@ func Migrate(db *gorm.DB) error {
 			return err
 		}
 	}
+	// Same for the goal check, which gained 'bulk' under a new name (ck_user_settings_goal_v2).
+	if m.HasConstraint(&settings.Row{}, "ck_user_settings_goal") {
+		if err := m.DropConstraint(&settings.Row{}, "ck_user_settings_goal"); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -150,7 +150,12 @@ export default function SettingsScreen() {
           <ListRow
             label={t('settings.targets')}
             value={`${formatNumber(s.targets.kcal)} ${t('common.kcal')}`}
-            onPress={go('/edit/targets')}
+            onPress={go('/edit/nutrition')}
+          />
+          <ListRow
+            label={t('settings.foodStyle')}
+            value={t(`foodStyle.pattern.${s.foodStyle.pattern}`)}
+            onPress={go('/edit/food-style')}
           />
         </Section>
 

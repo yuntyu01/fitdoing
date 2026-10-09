@@ -46,6 +46,12 @@ export function toSettingsBody(s: Settings): Settings {
   return {
     mode: s.mode,
     goal: s.goal,
+    sex: s.sex,
+    age: s.age,
+    activity: s.activity,
+    activityInput: s.activityInput
+      ? { daily: s.activityInput.daily, exercise: { ...s.activityInput.exercise } }
+      : null,
     heightCm: s.heightCm,
     weightKg: s.weightKg,
     meals: s.meals.map((m) => ({ index: m.index, deadline: m.deadline })),
@@ -63,6 +69,8 @@ export function toSettingsBody(s: Settings): Settings {
     sleep: { enabled: s.sleep.enabled, bedTime: s.sleep.bedTime, wakeTime: s.sleep.wakeTime },
     coupons: { rest: s.coupons.rest, cheat: s.coupons.cheat },
     targets: { kcal: s.targets.kcal, carbs: s.targets.carbs, protein: s.targets.protein, fat: s.targets.fat },
+    nutrition: s.nutrition ? structuredClone(s.nutrition) : null,
+    targetHistory: s.targetHistory.map((e) => ({ ...e })),
     allowedApps: [...s.allowedApps],
     lockMinutes: s.lockMinutes,
     emergencyPerWeek: s.emergencyPerWeek,
@@ -71,6 +79,9 @@ export function toSettingsBody(s: Settings): Settings {
     themeMode: s.themeMode,
     notifications: s.notifications,
     shareFriends: s.shareFriends,
+    foodStyle: { ...s.foodStyle },
+    allergies: [...s.allergies],
+    fasting: s.fasting ? { ...s.fasting } : null,
   };
 }
 

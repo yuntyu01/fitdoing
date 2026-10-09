@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -66,6 +67,8 @@ func (s *Service) Put(userID string, in Settings) (View, error) {
 	if err != nil {
 		return View{}, err
 	}
+	in.Merge(cur)
+	in.TargetHistory = s.nextHistory(in, cur)
 	var pending *Mode
 	var from *platform.Date
 	next := in
@@ -96,6 +99,14 @@ func (s *Service) Backup(userID string, in Settings) (View, error) {
 		}
 		seen[m.Index] = true
 	}
+	cur, _, err := s.load(userID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return View{}, err
+	}
+	if err == nil {
+		in.Merge(cur)
+		in.TargetHistory = s.nextHistory(in, cur)
+	}
 	if _, err := s.save(userID, in, nil, nil); err != nil {
 		return View{}, err
 	}
@@ -104,6 +115,44 @@ func (s *Service) Backup(userID string, in Settings) (View, error) {
 		return View{}, err
 	}
 	return viewOf(st, row), nil
+}
+
+// nextHistory: the app's targetHistory when it sent one; for an older app, the stored history plus the
+// change of targets from today on, so past dates keep the targets they had.
+func (s *Service) nextHistory(in, cur Settings) Opt[[]TargetEntry] {
+	if in.TargetHistory.Set {
+		return in.TargetHistory
+	}
+	var h []TargetEntry
+	if cur.TargetHistory.Val != nil {
+		h = *cur.TargetHistory.Val
+	}
+	if cur.Targets != nil && in.Targets != nil {
+		h = recordTargets(h, *cur.Targets, *in.Targets, s.clock.Today())
+	}
+	return Some(h)
+}
+
+// History is the stored targets per date, oldest first.
+func (s *Service) History(userID string) ([]TargetEntry, error) {
+	var rows []HistoryRow
+	if err := s.db.Where("user_id = ?", userID).Order("from_date").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]TargetEntry, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, TargetEntry{From: r.FromDate, Targets: Targets{r.Kcal, r.Carbs, r.Protein, r.Fat}})
+	}
+	return out, nil
+}
+
+// inputs is the JSON kept in user_settings.inputs.
+type inputs struct {
+	ActivityInput *json.RawMessage `json:"activityInput,omitempty"`
+	Nutrition     *json.RawMessage `json:"nutrition,omitempty"`
+	FoodStyle     *json.RawMessage `json:"foodStyle,omitempty"`
+	Allergies     *[]string        `json:"allergies,omitempty"`
+	Fasting       *json.RawMessage `json:"fasting,omitempty"`
 }
 
 func viewOf(st Settings, row Row) View {
@@ -150,6 +199,28 @@ func (s *Service) save(userID string, st Settings, pending *Mode, from *platform
 	}
 	if row.ThemeMode == "" {
 		row.ThemeMode = "system"
+	}
+	if st.Sex.Val != nil {
+		row.Sex = ptr(string(*st.Sex.Val))
+	}
+	row.Age = st.Age.Val
+	if st.Activity.Val != nil {
+		row.Activity = ptr(string(*st.Activity.Val))
+	}
+	in := inputs{st.ActivityInput.Val, st.Nutrition.Val, st.FoodStyle.Val, st.Allergies.Val, st.Fasting.Val}
+	if in != (inputs{}) {
+		b, err := json.Marshal(in)
+		if err != nil {
+			return row, err
+		}
+		row.Inputs = ptr(string(b))
+	}
+	var history []HistoryRow
+	if st.TargetHistory.Val != nil {
+		for _, e := range *st.TargetHistory.Val {
+			history = append(history, HistoryRow{UserID: userID, FromDate: e.From, Kcal: e.Kcal, Carbs: e.Carbs,
+				Protein: e.Protein, Fat: e.Fat})
+		}
 	}
 	if pending != nil {
 		p := string(*pending)
@@ -199,6 +270,17 @@ func (s *Service) save(userID string, st Settings, pending *Mode, from *platform
 				return err
 			}
 		}
+		// history is replaced only when the settings carry it (Set); otherwise it is left as stored
+		if st.TargetHistory.Set {
+			if err := tx.Where("user_id = ?", userID).Delete(&HistoryRow{}).Error; err != nil {
+				return err
+			}
+			if len(history) > 0 {
+				if err := tx.Omit("User").Create(&history).Error; err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	})
 	return row, err
@@ -237,6 +319,29 @@ func (s *Service) load(userID string) (Settings, Row, error) {
 		ShareFriends: row.ShareFriends,
 	}
 	st.Gym.WeeklyTarget = row.GymWeeklyTarget
+	st.Sex, st.Age, st.Activity = None[Sex](), Opt[int]{Set: true, Val: row.Age}, None[Activity]()
+	if row.Sex != nil {
+		st.Sex = Some(Sex(*row.Sex))
+	}
+	if row.Activity != nil {
+		st.Activity = Some(Activity(*row.Activity))
+	}
+	var in inputs
+	if row.Inputs != nil {
+		if err := json.Unmarshal([]byte(*row.Inputs), &in); err != nil {
+			return Settings{}, row, err
+		}
+	}
+	st.ActivityInput = Opt[json.RawMessage]{Set: true, Val: in.ActivityInput}
+	st.Nutrition = Opt[json.RawMessage]{Set: true, Val: in.Nutrition}
+	st.FoodStyle = Opt[json.RawMessage]{Set: true, Val: in.FoodStyle}
+	st.Allergies = Opt[[]string]{Set: true, Val: in.Allergies}
+	st.Fasting = Opt[json.RawMessage]{Set: true, Val: in.Fasting}
+	h, err := s.History(userID)
+	if err != nil {
+		return Settings{}, row, err
+	}
+	st.TargetHistory = Some(h)
 	for _, m := range slots {
 		st.Meals = append(st.Meals, MealSlot{Index: m.Idx, Deadline: m.Deadline})
 	}
