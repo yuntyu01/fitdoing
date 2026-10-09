@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { create } from 'zustand';
 
 import { secureDelete, secureGet, secureSet } from './secureStorage';
@@ -10,9 +11,20 @@ const TOKEN_KEY = 'fitdoing.token';
 const USER_KEY = 'fitdoing.userId';
 const OWNER_KEY = 'fitdoing.ownerId';
 
-// 개발용: 로그인 없이 쓴다. 서버도 AUTH_DISABLED=1 이어야 한다(아무 토큰이나 dev-user 로 받는다).
+// 로그인 없이 쓰는 빌드(개발·비공개 테스트). 서버도 AUTH_DISABLED=1 이어야 한다.
+// 설치마다 무작위 기기 토큰을 한 번 만들어 두고 보낸다: 서버는 토큰마다 따로 사용자를 만들어서
+// 테스터끼리 기록이 섞이지 않는다. 앱을 지우면 토큰도 지워져 새 사용자가 된다.
 export const AUTH_DISABLED = process.env.EXPO_PUBLIC_AUTH_DISABLED === '1';
-const DEV_USER = 'dev-user';
+const DEVICE_TOKEN_KEY = 'fitdoing.deviceToken';
+const DEVICE_USER = 'device'; // 로컬 표시용 (서버의 실제 사용자 id 는 토큰에서 나온다)
+
+async function deviceToken(): Promise<string> {
+  const saved = await safe(() => secureGet(DEVICE_TOKEN_KEY), null);
+  if (saved) return saved;
+  const token = `device-${randomUUID()}`;
+  await safe(() => secureSet(DEVICE_TOKEN_KEY, token), undefined);
+  return token;
+}
 
 export type SessionStatus = 'loading' | 'out' | 'in';
 
@@ -37,7 +49,8 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 /** 앱 시작 때 한 번: 저장된 세션을 읽어 status 를 'in' 또는 'out' 으로 정한다. */
 export async function loadSession(): Promise<void> {
   if (AUTH_DISABLED) {
-    useSession.setState({ status: 'in', token: 'dev', userId: DEV_USER, ownerId: DEV_USER });
+    const token = await deviceToken();
+    useSession.setState({ status: 'in', token, userId: DEVICE_USER, ownerId: DEVICE_USER });
     return;
   }
   const [token, userId, ownerId] = await Promise.all([

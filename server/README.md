@@ -48,7 +48,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `PUBLIC_BASE_URL` | 요청 주소 | 공유 페이지 링크의 앞부분(예: `https://fitdoing.app`). 비우면 요청이 들어온 주소(프록시 뒤면 `X-Forwarded-Proto/Host`) |
 | `PHOTO_STORE` | 비움(사진 백업 끔) | `file`(`PHOTO_DIR`, 기본 `./photos`) \| `r2`. 비우면 사진 백업 API는 503 `PHOTO_BACKUP_UNAVAILABLE` |
 | `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | - | `PHOTO_STORE=r2`일 때 모두 필수. 엔드포인트는 `https://<계정 ID>.r2.cloudflarestorage.com` (S3 호환 API, 서명 V4, region `auto`) |
-| `AUTH_DISABLED` | - | `1`이면 로그인 없이 아무 Bearer 토큰이나 고정 사용자 `dev-user`로 받는다(개발 전용). 앱은 `EXPO_PUBLIC_AUTH_DISABLED=1`로 로그인 화면 없이 시작 |
+| `AUTH_DISABLED` | - | `1`이면 로그인 없이 쓴다(개발·비공개 테스트용). Bearer 토큰마다 따로 사용자가 생긴다: 앱(`EXPO_PUBLIC_AUTH_DISABLED=1`)은 설치마다 무작위 기기 토큰을 만들어 보내므로 테스터마다 기록이 나뉘고 테스터끼리 친구도 된다. 16자 미만 토큰은 거절, `dev`는 공용 `dev-user`(curl용). 앱을 지우면 새 사용자가 된다 |
 | `KAKAO_APP_ID` | - | 카카오 앱 ID(숫자). 다른 앱에서 발급한 토큰은 거절한다 |
 | `KAKAO_TOKEN_INFO_URL` | 카카오 기본 주소 | 카카오 토큰 확인 주소. 가짜 카카오로 끝에서 끝까지 시험할 때만 바꾼다 |
 | `APPLE_CLIENT_ID` | `com.fitdoing.app` | 애플 identityToken의 audience (앱 번들 ID) |

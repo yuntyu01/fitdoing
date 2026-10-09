@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatNumber } from '../../domain/format';
 import { useSyncStatus } from '../../features/api/store';
 import { deleteAccountAndData, logout } from '../../features/auth/account';
+import { AUTH_DISABLED } from '../../features/auth/session';
 import { CouponSheet } from '../../features/coupons/CouponSheet';
 import { useCouponStatus } from '../../features/coupons/useCoupons';
 import { askToEnableNotifications } from '../../features/settings/notifications';
@@ -197,10 +198,13 @@ export default function SettingsScreen() {
           <ListRow disabled label={t('sync.title')} value={syncValue} />
         </Section>
 
-        <Section title={t('settings.sectionAccount')}>
-          <ListRow label={t('settings.logout')} onPress={confirmLogout} />
-          <ListRow label={t('settings.deleteAccount')} onPress={confirmDelete} />
-        </Section>
+        {/* 로그인 없는 빌드(비공개 테스트)에는 로그아웃할 계정이 없다: 누르면 로그인 화면에 갇힌다 */}
+        {AUTH_DISABLED ? null : (
+          <Section title={t('settings.sectionAccount')}>
+            <ListRow label={t('settings.logout')} onPress={confirmLogout} />
+            <ListRow label={t('settings.deleteAccount')} onPress={confirmDelete} />
+          </Section>
+        )}
       </ScrollView>
       <CouponSheet visible={couponOpen} onClose={() => setCouponOpen(false)} />
       <ThemeSheet

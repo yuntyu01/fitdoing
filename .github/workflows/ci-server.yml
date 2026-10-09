@@ -1,0 +1,29 @@
+name: "CI: server"
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**", "docs/contract/**", ".github/workflows/ci-server.yml"]
+  pull_request:
+    paths: ["server/**", "docs/contract/**", ".github/workflows/ci-server.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: go vet ./...
+      # 인메모리 SQLite 로 전체 API 테스트 (계약 JSON 은 docs/contract 를 읽는다)
+      - run: go test ./...
+      # KoDeploy 에 올릴 이미지가 실제로 만들어지는지
+      - run: docker build -t fitdoing-server .

@@ -5,6 +5,8 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"time"
@@ -136,14 +138,24 @@ func (s *Service) DeleteAccount(userID string) error {
 	return s.db.Delete(&platform.User{}, "id = ?", userID).Error
 }
 
-// DevUserID is the one user of AUTH_DISABLED mode.
+// DevUserID is the user of the plain "dev" token in AUTH_DISABLED mode (curl, old dev builds).
 const DevUserID = "dev-user"
 
-// DevResolve accepts any token as the fixed dev user (created on first use). Development only: AUTH_DISABLED=1.
-func (s *Service) DevResolve(string) (string, error) {
-	u := platform.User{ID: DevUserID, CreatedAt: s.now()}
-	if err := s.db.Where("id = ?", DevUserID).FirstOrCreate(&u).Error; err != nil {
+// DevResolve is the login of AUTH_DISABLED mode (development and closed testing without login): every token is
+// its own user, created on first use. The app sends a random per-install token, so each tester gets their own data
+// (and friends work between testers) without any login. The token "dev" is the shared dev user.
+func (s *Service) DevResolve(token string) (string, error) {
+	id := DevUserID
+	if token != "dev" {
+		if len(token) < 16 {
+			return "", ErrInvalidToken // a device token is long and random; refuse guessable ones
+		}
+		sum := sha256.Sum256([]byte(token))
+		id = "dev-" + hex.EncodeToString(sum[:12])
+	}
+	u := platform.User{ID: id, CreatedAt: s.now()}
+	if err := s.db.Where("id = ?", id).FirstOrCreate(&u).Error; err != nil {
 		return "", err
 	}
-	return DevUserID, nil
+	return id, nil
 }

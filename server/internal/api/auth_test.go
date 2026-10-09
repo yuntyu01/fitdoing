@@ -117,16 +117,27 @@ func TestDeleteAccountRemovesEverythingAndInvalidatesTheToken(t *testing.T) {
 	}
 }
 
-func TestAuthDisabledAcceptsAnyTokenAsOneDevUser(t *testing.T) {
+func TestAuthDisabledGivesEachDeviceTokenItsOwnUser(t *testing.T) {
 	db, _ := platform.OpenDB("sqlite", ":memory:")
 	if err := Migrate(db); err != nil {
 		t.Fatal(err)
 	}
 	svc := auth.NewService(db, "test-secret-test-secret-test-secret-0123", nil, nil)
 	e := &env{t: t, db: db, srv: New(db, ai.Mock{}, platform.Clock{Loc: time.UTC}, nil, svc, Options{AuthDisabled: true})}
-	e.do("GET", "/api/settings", "", "dev").is(t, 200)
-	e.do("GET", "/api/settings", "", "anything-else").is(t, 200)
-	if e.count("users") != 1 {
-		t.Fatalf("users = %d, want exactly the dev user", e.count("users"))
+	phoneA, phoneB := "device-aaaaaaaaaaaaaaaaaaaaaaaa", "device-bbbbbbbbbbbbbbbbbbbbbbbb"
+
+	e.do("GET", "/api/settings", "", "dev").is(t, 200) // the shared dev user
+	e.do("GET", "/api/settings", "", phoneA).is(t, 200)
+	e.do("GET", "/api/settings", "", phoneA).is(t, 200)
+	e.do("GET", "/api/settings", "", phoneB).is(t, 200)
+	if n := e.count("users"); n != 3 {
+		t.Fatalf("users = %d, want dev + one per device token", n)
 	}
+	// each phone sees only its own meals
+	e.do("POST", "/api/meals", mealBody("2026-09-26", 1, 1, 400, false), phoneA).is(t, 200)
+	if r := e.do("GET", "/api/meals?date=2026-09-26", "", phoneB).is(t, 200); len(r.List) != 0 {
+		t.Fatalf("phone B sees phone A's meal: %s", r.Raw)
+	}
+	// short (guessable) tokens are refused
+	e.do("GET", "/api/settings", "", "short").code(t, 401, "UNAUTHORIZED")
 }
