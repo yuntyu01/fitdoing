@@ -16,11 +16,27 @@ export function streak(loggedDates: Set<string>, now: Date): number {
   return n;
 }
 
-/** 이번 주 헬스: 인증한 날 수 / 계획한 요일 수 */
-export function gymWeek(verifiedDates: string[], plannedDays: number[], now: Date) {
+/** 이번 주 헬스: 인증한 날 수 / 주간 목표 (서버 stats GymWeek.Planned와 같은 값) */
+export function gymWeek(verifiedDates: string[], weeklyTarget: number, now: Date) {
   const wk = weekKey(now);
   const done = new Set(verifiedDates.filter((d) => weekKey(parseDateKey(d)) === wk)).size;
-  return { done, planned: plannedDays.length };
+  return { done, planned: clampWeeklyTarget(weeklyTarget, 7) };
+}
+
+/** 주간 목표는 1회 이상, 고른 요일 수(최대 7) 이하. 요일이 없어도 1로 둔다. */
+export function clampWeeklyTarget(target: number, dayCount: number): number {
+  const max = Math.max(1, Math.min(7, dayCount));
+  const n = Number.isFinite(target) ? Math.round(target) : max;
+  return Math.min(max, Math.max(1, n));
+}
+
+/**
+ * 운동 요일을 바꿀 때의 주간 목표.
+ * 목표가 고른 요일 수와 같았으면(= 고른 날 모두 가기) 새 요일 수를 따라가고, 아니면 새 요일 수 안으로만 줄인다.
+ */
+export function weeklyTargetForDays(prevTarget: number, prevDayCount: number, nextDayCount: number): number {
+  if (prevTarget >= prevDayCount) return clampWeeklyTarget(nextDayCount, nextDayCount);
+  return clampWeeklyTarget(prevTarget, nextDayCount);
 }
 
 export function isGymDay(plannedDays: number[], d: Date): boolean {

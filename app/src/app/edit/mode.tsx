@@ -1,15 +1,14 @@
 import { router } from 'expo-router';
-import { Check } from 'lucide-react-native';
-import { Fragment } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import type { Mode } from '../../db/schema';
+import { RadioRow } from '../../features/settings/editors/Form';
 import { useSettings, useSettingsValue } from '../../features/settings/store';
-import { Card, Divider } from '../../ui/Card';
+import { FullButton } from '../../ui/FullButton';
 import { SubHeader } from '../../ui/Headers';
 import { Screen } from '../../ui/Screen';
-import { colors, fonts, space, type } from '../../ui/tokens';
 
 // 1차 범위는 보통맛만. 순한맛·매운맛은 자리만 둔다.
 const ENABLED: Mode[] = ['normal'];
@@ -18,6 +17,7 @@ export default function EditMode() {
   const { t } = useTranslation();
   const s = useSettingsValue();
   const update = useSettings((st) => st.update);
+  const [mode, setMode] = useState<Mode>(s.mode);
 
   const modes: { value: Mode; name: string; desc: string }[] = [
     { value: 'mild', name: t('settings.modeMild'), desc: t('settings.modeMildDesc') },
@@ -26,40 +26,34 @@ export default function EditMode() {
   ];
 
   return (
-    <Screen header={<SubHeader title={t('settings.mode')} onBack={() => router.back()} />}>
-      <Card style={{ paddingVertical: space.xs }}>
-        {modes.map((m, i) => {
+    <Screen
+      header={<SubHeader title={t('settings.mode')} onBack={() => router.back()} />}
+      footer={
+        <FullButton
+          label={t('edit.save')}
+          onPress={() => {
+            update({ mode });
+            router.back();
+          }}
+        />
+      }
+    >
+      <View style={{ gap: 4 }}>
+        {modes.map((m) => {
           const enabled = ENABLED.includes(m.value);
-          const on = s.mode === m.value;
           return (
-            <Fragment key={m.value}>
-              {i > 0 ? <Divider /> : null}
-              <Pressable
-                disabled={!enabled}
-                onPress={() => update({ mode: m.value })}
-                style={[styles.row, !enabled && styles.disabled]}
-              >
-                <View style={styles.text}>
-                  <Text style={styles.name}>
-                    {m.name}
-                    {!enabled ? <Text style={styles.soon}>{`  ${t('common.comingSoon')}`}</Text> : null}
-                  </Text>
-                  <Text style={type.caption}>{m.desc}</Text>
-                </View>
-                {on ? <Check size={22} color={colors.text} strokeWidth={2} /> : null}
-              </Pressable>
-            </Fragment>
+            <RadioRow
+              key={m.value}
+              label={m.name}
+              desc={m.desc}
+              note={enabled ? undefined : t('common.comingSoon')}
+              selected={mode === m.value}
+              disabled={!enabled}
+              onPress={() => setMode(m.value)}
+            />
           );
         })}
-      </Card>
+      </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.m, gap: space.m },
-  disabled: { opacity: 0.4 },
-  text: { flex: 1, gap: 2 },
-  name: { fontFamily: fonts.medium, fontSize: 17, color: colors.text },
-  soon: { fontFamily: fonts.regular, fontSize: 13, color: colors.sub },
-});

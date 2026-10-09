@@ -3,11 +3,14 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { couponUses, gymLogs, lockEvents, mealLogs, settings as settingsTable, sleepLogs } from '../../db/schema';
 import { toMealBackup } from '../../domain/logging';
+import type { PhotoSync } from '../../domain/portion';
 import {
   couponItem,
   gymItem,
   initialSyncItems,
   lockItem,
+  PHOTO_WIPE,
+  photoItem,
   sleepItem,
   toCouponUseBody,
   toGymLogBody,
@@ -30,6 +33,33 @@ const guard = (fn: () => QueueItem[]) => {
     console.warn('sync track failed', e);
   }
 };
+
+/**
+ * 방금 기록한 끼니의 사진을 서버에 맞춘다. 사진 백업을 켰거나 친구에게 공유한 끼니만 올리고,
+ * 공유했던 끼니를 공유 없이(또는 사진 없이) 다시 기록했으면 서버 사진을 지운다. 판단은 domain/portion의 photoSync.
+ * 끼니 백업보다 뒤에 보낸다(planRequests 순서).
+ */
+export function trackMealPhoto(date: string, index: number, uri: string | null, action: PhotoSync) {
+  if (action === 'none') return;
+  guard(() => [photoItem({ date, index, uri: action === 'upload' ? uri : null })]);
+}
+
+/**
+ * 설정에서 사진 백업을 바꿨을 때. 켜면 폰에 있는 끼니 사진을 모두 올리고, 끄면 서버의 사진을 모두 지운다
+ * (아직 못 올린 사진은 보내지 않는다).
+ */
+export function photoBackupChanged(on: boolean) {
+  guard(() => {
+    const meals = db.select().from(mealLogs).where(eq(mealLogs.status, 'logged')).all();
+    const withPhoto = meals.filter((m) => m.photoUri);
+    // 끄면 서버 사진을 모두 지우되, 친구에게 공유한 끼니의 사진은 친구가 계속 볼 수 있게 지운 뒤 다시 올린다
+    if (!on) {
+      const shared = withPhoto.filter((m) => m.shareFriends);
+      return [PHOTO_WIPE, ...shared.map((m) => photoItem({ date: m.date, index: m.index, uri: m.photoUri }))];
+    }
+    return withPhoto.map((m) => photoItem({ date: m.date, index: m.index, uri: m.photoUri }));
+  });
+}
 
 export function trackGym(date: string) {
   guard(() => {

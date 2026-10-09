@@ -15,10 +15,13 @@ export function useNow(): Date {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     const tick = () => setNow(new Date());
-    const timeout = setTimeout(() => {
-      tick();
-      interval = setInterval(tick, 60_000);
-    }, 60_000 - (Date.now() % 60_000));
+    const timeout = setTimeout(
+      () => {
+        tick();
+        interval = setInterval(tick, 60_000);
+      },
+      60_000 - (Date.now() % 60_000),
+    );
     const sub = AppState.addEventListener('change', (s) => s === 'active' && tick());
     return () => {
       clearTimeout(timeout);
@@ -67,7 +70,7 @@ export function useToday(settings: Settings, now: Date) {
       streak: streak(daySet, now),
       loggedDays: daySet,
       gym: {
-        ...gymWeek(gymDates, settings.gym.days, now),
+        ...gymWeek(gymDates, settings.gym.weeklyTarget, now),
         today: isGymDay(settings.gym.days, now),
         doneToday: gymDates.includes(dateKey(now)),
       },

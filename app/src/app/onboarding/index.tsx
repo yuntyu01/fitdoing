@@ -1,38 +1,41 @@
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from 'react-native';
 
 import { useOnboardingDraft } from '../../features/onboarding/draft';
-import { isProfileValid, ProfileEditor } from '../../features/settings/editors/ProfileEditor';
-import { Card } from '../../ui/Card';
+import { cleanNickname, isProfileValid, ProfileEditor } from '../../features/settings/editors/ProfileEditor';
 import { FullButton } from '../../ui/FullButton';
 import { StepHeader } from '../../ui/Headers';
 import { Screen } from '../../ui/Screen';
-import { fonts, space, type } from '../../ui/tokens';
 
 export default function GoalStep() {
   const { t } = useTranslation();
   const profile = useOnboardingDraft((s) => s.profile);
   const setProfile = useOnboardingDraft((s) => s.setProfile);
+  const nickname = useOnboardingDraft((s) => s.settings.nickname);
+  const set = useOnboardingDraft((s) => s.set);
 
   return (
     <Screen
-      header={<StepHeader title={t('app.name')} step={1} total={3} />}
+      header={<StepHeader step={1} total={4} />}
       title={t('onboarding.goalTitle')}
-      desc={t('onboarding.goalDesc')}
       footer={
         <FullButton
           label={t('common.next')}
           disabled={!isProfileValid(profile)}
-          onPress={() => router.push('/onboarding/meals')}
+          onPress={() => {
+            set({ nickname: cleanNickname(nickname) });
+            router.push('/onboarding/meals');
+          }}
         />
       }
     >
-      <ProfileEditor value={profile} onChange={setProfile} />
-      <Card style={{ gap: space.s + 4, padding: space.l, paddingVertical: space.l + 4 }}>
-        <Text style={{ fontFamily: fonts.medium, fontSize: 18 }}>{t('onboarding.noteTitle')}</Text>
-        <Text style={type.note}>{t('onboarding.noteBody')}</Text>
-      </Card>
+      {/* 닉네임은 친구에게 보이는 이름이라 선택. 비워 두면 설정에서 나중에 정한다. */}
+      <ProfileEditor
+        value={profile}
+        onChange={setProfile}
+        bodyNote={t('onboarding.changeLater')}
+        nickname={{ value: nickname, onChange: (v) => set({ nickname: v }), title: t('onboarding.nicknameOptional') }}
+      />
     </Screen>
   );
 }

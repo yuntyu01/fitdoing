@@ -20,13 +20,19 @@ import {
 } from './screenshots.config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.resolve(ROOT, '..', 'docs', 'screenshots');
+const OUT_DEFAULT = path.resolve(ROOT, '..', 'docs', 'screenshots');
 const DIST = path.join(ROOT, 'node_modules', '.cache', 'fitdoing-web');
 
 const args = process.argv.slice(2);
 const urlArg = args.indexOf('--url') >= 0 ? args[args.indexOf('--url') + 1] : null;
 const noBuild = args.includes('--no-build');
+// --dark: 다크 모드로 찍는다. --width=360: 폭을 바꾼다. --out=<폴더>: docs/screenshots 대신 다른 곳에 쓴다.
+const dark = args.includes('--dark');
+const widthArg = Number(args.find((a) => a.startsWith('--width='))?.slice(8)) || null;
+const outArg = args.find((a) => a.startsWith('--out='))?.slice(6) ?? null;
+const OUT = outArg ? path.resolve(outArg) : OUT_DEFAULT;
 const only = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--url');
+const routePath = (r) => r.split('?')[0]; // /day?date=… 같은 쿼리는 파일 경로 확인에서 뺀다
 
 /** src/app 파일 구조 -> 라우트. (group) 은 빼고, _layout/+특수/동적 [x] 는 건너뛴다. */
 function collectRoutes(dir = path.join(ROOT, 'src', 'app'), prefix = '') {
@@ -46,10 +52,10 @@ function collectRoutes(dir = path.join(ROOT, 'src', 'app'), prefix = '') {
 
 function plan() {
   const existing = new Set(collectRoutes());
-  const known = new Set(SCREENS.map((s) => s.route));
+  const known = new Set(SCREENS.map((s) => routePath(s.route)));
   const list = [];
   const missing = [];
-  for (const s of SCREENS) (existing.has(s.route) ? list : missing).push(s);
+  for (const s of SCREENS) (existing.has(routePath(s.route)) ? list : missing).push(s);
   for (const r of existing) {
     if (!known.has(r)) list.push({ route: r, name: r.slice(1).replace(/\//g, '-') || 'index' });
   }
@@ -86,7 +92,8 @@ function serve() {
 async function shoot(browser, base, s) {
   const fresh = s.mode === 'fresh';
   const context = await browser.newContext({
-    viewport: VIEWPORT,
+    viewport: widthArg ? { ...VIEWPORT, width: widthArg } : VIEWPORT,
+    colorScheme: dark ? 'dark' : 'light',
     deviceScaleFactor: SCALE,
     isMobile: true,
     hasTouch: true,
@@ -96,6 +103,7 @@ async function shoot(browser, base, s) {
   const page = await context.newPage();
   await page.clock.setFixedTime(new Date(s.time ?? FIXED_TIME));
   if (fresh) await page.addInitScript(() => { window.__FD_FRESH__ = true; });
+  if (s.mode === 'loggedOut') await page.addInitScript(() => { window.__FD_LOGGED_OUT__ = true; });
   try {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: SAFE_AREA });

@@ -1,9 +1,11 @@
-import { ChevronLeft, ChevronRight, Dumbbell, Moon } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, Circle, Dumbbell, Lock } from 'lucide-react-native';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { dayState, type DayFacts, type YearMonth } from '../../domain/calendar';
-import { colors, fonts, radius, space, tabular } from '../../ui/tokens';
+import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
+import { fonts, layout, radius, text } from '../../ui/tokens';
 
 interface Props {
   ym: YearMonth;
@@ -13,25 +15,35 @@ interface Props {
   selected: string | null;
   onSelect: (date: string) => void;
   onShift: (delta: number) => void;
+  note?: string; // 달 제목 아래 한 줄 (이 달 요약)
 }
 
-const FULL_BG = colors.accent;
-const PARTIAL_BG = '#D5D9DE';
+const MARK = 10; // 숫자 아래 작은 표시 크기
 
-export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift }: Props) {
+/**
+ * 상자 없는 달력. 오늘은 얇은 테두리, 고른 날(오늘이 아니면)은 회색 채움.
+ * 숫자 아래에 끼니(모두 ✓ / 일부 ○), 잠김, 헬스를 작게 — 한 칸에 셋까지만.
+ */
+export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift, note }: Props) {
   const { t } = useTranslation();
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View>
       <View style={styles.head}>
-        <Pressable onPress={() => onShift(-1)} hitSlop={12} accessibilityLabel={t('records.prevMonth')}>
-          <ChevronLeft size={24} color={colors.text} strokeWidth={1.8} />
-        </Pressable>
         <Text style={styles.month}>{t('records.monthTitle', { year: ym.year, month: ym.month + 1 })}</Text>
-        <Pressable onPress={() => onShift(1)} hitSlop={12} accessibilityLabel={t('records.nextMonth')}>
-          <ChevronRight size={24} color={colors.text} strokeWidth={1.8} />
-        </Pressable>
+        <View style={styles.nav}>
+          <Pressable onPress={() => onShift(-1)} hitSlop={12} accessibilityLabel={t('records.prevMonth')}>
+            <ChevronLeft size={22} color={c.text} strokeWidth={1.8} />
+          </Pressable>
+          <Pressable onPress={() => onShift(1)} hitSlop={12} accessibilityLabel={t('records.nextMonth')}>
+            <ChevronRight size={22} color={c.text} strokeWidth={1.8} />
+          </Pressable>
+        </View>
       </View>
-      <View style={styles.week}>
+      {note ? <Text style={styles.note}>{note}</Text> : null}
+
+      <View style={[styles.week, styles.weekHead]}>
         {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <Text key={i} style={styles.wd}>
             {t(`weekdayShort.${String(i) as '0'}`)}
@@ -45,25 +57,24 @@ export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift 
             const f = facts.get(date);
             const st = f ? dayState(f) : 'none';
             const isToday = date === today;
-            const isSel = date === selected;
-            const full = st === 'full';
+            const isSel = date === selected && !isToday; // 오늘은 테두리만으로 충분하다
             return (
-              <Pressable key={ci} style={styles.cell} onPress={() => onSelect(date)}>
+              <Pressable
+                key={ci}
+                style={styles.cell}
+                onPress={() => onSelect(date)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: date === selected }}
+                accessibilityLabel={date}
+              >
                 <View style={[styles.box, isToday && styles.today, isSel && styles.sel]}>
-                  <View
-                    style={[
-                      styles.circle,
-                      st === 'full' && { backgroundColor: FULL_BG },
-                      st === 'partial' && { backgroundColor: PARTIAL_BG },
-                    ]}
-                  >
-                    <Text style={[styles.day, full && { color: colors.onAccent }]}>{Number(date.slice(8))}</Text>
-                  </View>
-                  <View style={styles.marks}>
-                    {f?.locked ? <View style={styles.dot} /> : null}
-                    {f?.gym ? <Dumbbell size={11} color={colors.text} strokeWidth={2} /> : null}
-                    {f?.sleep ? <Moon size={11} color={colors.sub} strokeWidth={2} /> : null}
-                  </View>
+                  <Text style={[styles.day, (isToday || isSel) && styles.dayOn]}>{Number(date.slice(8))}</Text>
+                </View>
+                <View style={styles.marks}>
+                  {st === 'full' ? <Check size={MARK + 1} color={c.text} strokeWidth={2.5} /> : null}
+                  {st === 'partial' ? <Circle size={MARK - 2} color={c.sub} strokeWidth={2.5} /> : null}
+                  {f?.locked ? <Lock size={MARK} color={c.sub} strokeWidth={2.2} /> : null}
+                  {f?.gym ? <Dumbbell size={MARK} color={c.sub} strokeWidth={2.2} /> : null}
                 </View>
               </Pressable>
             );
@@ -74,17 +85,52 @@ export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift 
   );
 }
 
-const styles = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.m },
-  month: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...tabular },
-  week: { flexDirection: 'row' },
-  wd: { flex: 1, textAlign: 'center', fontFamily: fonts.regular, fontSize: 13, color: colors.sub, paddingBottom: space.s },
-  cell: { flex: 1, aspectRatio: 0.78, padding: 1 },
-  box: { flex: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1.5, borderColor: 'transparent' },
-  today: { borderColor: colors.line },
-  sel: { borderColor: colors.accent },
-  circle: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  day: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...tabular },
-  marks: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 12 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.text },
-});
+/** 달력 아래 한 줄 범례. 달력이 쓰는 표시만 적는다. */
+export function CalendarLegend() {
+  const { t } = useTranslation();
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
+  const item = (icon: ReactNode, label: string) => (
+    <View style={styles.key}>
+      {icon}
+      <Text style={styles.keyText}>{label}</Text>
+    </View>
+  );
+  return (
+    <View style={styles.legend}>
+      {item(<Check size={MARK + 1} color={c.sub} strokeWidth={2.5} />, t('records.legendFull'))}
+      {item(<Circle size={MARK - 2} color={c.sub} strokeWidth={2.5} />, t('records.legendPartial'))}
+      {item(<Lock size={MARK} color={c.sub} strokeWidth={2.2} />, t('records.legendLocked'))}
+      {item(<Dumbbell size={MARK} color={c.sub} strokeWidth={2.2} />, t('records.legendGym'))}
+    </View>
+  );
+}
+
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: layout.related },
+    month: { ...text.heading, color: c.text, fontVariant: ['tabular-nums'] },
+    nav: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+    note: { ...text.caption, color: c.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
+    week: { flexDirection: 'row' },
+    weekHead: { marginTop: 20, marginBottom: 6 },
+    wd: { ...text.caption, flex: 1, textAlign: 'center', color: c.sub },
+    cell: { flex: 1, alignItems: 'center', paddingVertical: 4, gap: 2 },
+    box: {
+      width: 36,
+      height: 36,
+      borderRadius: radius.day,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: layout.hairline,
+      borderColor: 'transparent',
+    },
+    today: { borderColor: c.focus },
+    sel: { backgroundColor: c.selected },
+    day: { ...text.body, color: c.text, fontVariant: ['tabular-nums'] },
+    dayOn: { fontFamily: fonts.semibold },
+    marks: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 12 },
+    legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4, marginTop: 12 },
+    key: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    keyText: { ...text.small, color: c.sub },
+  });

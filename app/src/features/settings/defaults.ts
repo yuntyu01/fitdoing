@@ -13,6 +13,7 @@ export function initialSettings(): Settings {
     gym: {
       enabled: true,
       days: [0, 1, 2, 3, 4],
+      weeklyTarget: 5,
       arriveBy: '19:00',
       name: '',
       address: '',
@@ -27,5 +28,9 @@ export function initialSettings(): Settings {
     lockMinutes: 120,
     emergencyPerWeek: 2,
     photoBackup: false,
+    nickname: '',
+    themeMode: 'system',
+    notifications: true,
+    shareFriends: false,
   };
 }

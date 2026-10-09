@@ -4,7 +4,8 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '../../../ui/BottomSheet';
 import { FullButton } from '../../../ui/FullButton';
-import { colors, fonts, radius, space } from '../../../ui/tokens';
+import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
+import { fonts, layout, radius, text } from '../../../ui/tokens';
 
 export interface FoodItem {
   name: string;
@@ -32,21 +33,53 @@ export function ItemSheet({ visible, initial, onClose, onSave, onDelete }: Props
 // 시트가 열릴 때마다 새로 만들어져서 입력 상태가 initial로 시작한다.
 function ItemForm({ initial, onSave, onDelete }: Pick<Props, 'initial' | 'onSave' | 'onDelete'>) {
   const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const [name, setName] = useState(initial?.name ?? '');
   const [amount, setAmount] = useState(initial?.amount ?? '');
   return (
-    <>
-      <View style={styles.body}>
-        <Field label={t('review.itemName')} value={name} onChange={setName} placeholder={t('review.itemNamePlaceholder')} autoFocus />
-        <Field label={t('review.itemAmount')} value={amount} onChange={setAmount} placeholder={t('review.itemAmountPlaceholder')} />
-        <FullButton label={t('common.save')} disabled={name.trim() === ''} onPress={() => onSave({ name: name.trim(), amount: amount.trim() })} />
-        {initial && onDelete ? <FullButton variant="secondary" label={t('review.delete')} onPress={onDelete} /> : null}
+    <View style={styles.body}>
+      <View style={styles.fields}>
+        <Field
+          label={t('review.itemName')}
+          value={name}
+          onChange={setName}
+          placeholder={t('review.itemNamePlaceholder')}
+          autoFocus
+        />
+        <Field
+          label={t('review.itemAmount')}
+          value={amount}
+          onChange={setAmount}
+          placeholder={t('review.itemAmountPlaceholder')}
+        />
       </View>
-    </>
+      <View style={styles.buttons}>
+        <FullButton
+          label={t('common.save')}
+          disabled={name.trim() === ''}
+          onPress={() => onSave({ name: name.trim(), amount: amount.trim() })}
+        />
+        {initial && onDelete ? <FullButton variant="text" label={t('review.delete')} onPress={onDelete} /> : null}
+      </View>
+    </View>
   );
 }
 
-function Field({ label, value, onChange, placeholder, autoFocus }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  autoFocus?: boolean;
+}) {
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -55,21 +88,33 @@ function Field({ label, value, onChange, placeholder, autoFocus }: { label: stri
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
-          placeholderTextColor={colors.faint}
+          placeholderTextColor={c.faint}
           autoFocus={autoFocus}
           maxLength={40}
           style={styles.input}
-          selectionColor={colors.text}
+          selectionColor={c.text}
+          accessibilityLabel={label}
         />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  body: { gap: space.m },
-  field: { gap: space.s },
-  label: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
-  box: { height: 56, borderRadius: radius.tile, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: space.m + space.xs },
-  input: { fontFamily: fonts.medium, fontSize: 17, color: colors.text, padding: 0 },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    body: { gap: layout.block },
+    fields: { gap: 20 },
+    buttons: { gap: layout.related },
+    field: { gap: layout.related },
+    label: { ...text.caption, color: c.sub },
+    box: {
+      height: 52,
+      borderRadius: radius.field,
+      borderWidth: layout.hairline,
+      borderColor: c.border,
+      backgroundColor: c.card,
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+    },
+    input: { fontFamily: fonts.medium, fontSize: 17, color: c.text, padding: 0 },
+  });

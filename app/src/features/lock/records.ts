@@ -75,8 +75,15 @@ export function ensureStarted(lock: ActiveLock) {
   }
 }
 
-function closeEvent(ev: { id: number; type: LockType; startedAt: number }, endedAt: number, by: ReleaseBy) {
-  db.update(lockEvents).set({ endedAt, releasedBy: by }).where(eq(lockEvents.id, ev.id)).run();
+function closeEvent(
+  ev: { id: number; type: LockType; startedAt: number },
+  endedAt: number,
+  by: ReleaseBy,
+  reason?: string | null,
+) {
+  // 사유는 비상 해제 때만 넘어온다. 안 넘기면 기존 값을 건드리지 않는다.
+  const patch = reason === undefined ? { endedAt, releasedBy: by } : { endedAt, releasedBy: by, reason };
+  db.update(lockEvents).set(patch).where(eq(lockEvents.id, ev.id)).run();
   trackLock(ev.type, ev.startedAt);
   if (ev.type === 'sleep') {
     const date = dateKey(new Date(ev.startedAt));
@@ -85,10 +92,10 @@ function closeEvent(ev: { id: number; type: LockType; startedAt: number }, ended
   }
 }
 
-/** 해제 수단을 기록하고 그 종류의 열린 잠금을 모두 닫는다. 닫은 개수를 돌려준다. */
-export function closeOpen(type: LockType, by: ReleaseBy, now: Date): number {
+/** 해제 수단(+ 비상 해제 사유)을 기록하고 그 종류의 열린 잠금을 모두 닫는다. 닫은 개수를 돌려준다. */
+export function closeOpen(type: LockType, by: ReleaseBy, now: Date, reason?: string | null): number {
   const evs = openEvents(type);
-  for (const ev of evs) closeEvent(ev, now.getTime(), by);
+  for (const ev of evs) closeEvent(ev, now.getTime(), by, reason);
   return evs.length;
 }
 

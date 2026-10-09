@@ -3,93 +3,125 @@ import { ChevronRight } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { perMealTarget, type Targets } from '../../../domain/targets';
-import { roundGram, roundKcal } from '../../../domain/format';
-import { Card } from '../../../ui/Card';
-import { colors, fonts, space } from '../../../ui/tokens';
+import { formatNumber, roundGram, roundKcal } from '../../../domain/format';
+import { eatenFactor } from '../../../domain/stats';
+import { remainingPerMeal, type Targets } from '../../../domain/targets';
+import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
+import { fonts, layout, radius } from '../../../ui/tokens';
 import type { TodayData } from '../useToday';
 
-/** 오늘 식단 표. 아직 안 찍은 끼니는 끼니 목표를 연한 회색으로. */
+/**
+ * 오늘 식단 표. 기록한 끼니는 먹은 만큼, 아직 안 찍은 끼니는 "N끼 예정"과 남은 양을 똑같이 나눈 목표를 보조색으로, 놓친 끼니는 더 흐리게 "-".
+ * 숫자 열은 오른쪽 정렬 + tabular 숫자라 자릿수가 세로로 맞는다.
+ */
 export function MealTable({ data, targets }: { data: TodayData; targets: Targets }) {
   const { t } = useTranslation();
-  const goal = perMealTarget(targets, data.meals.length);
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
+  // 아직 안 찍은 끼니(놓친 끼니 제외)는 오늘 남은 양을 똑같이 나눠 가진다
+  const planned = data.meals.filter((m) => !m.log?.ai && m.state !== 'missed').length;
+  const goal = remainingPerMeal(targets, data.totals, planned);
+  const heads = [t('home.colKcal'), t('home.colCarbs'), t('home.colProtein'), t('home.colFat')];
 
   return (
-    <Card style={styles.card}>
+    <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.title}>{t('home.table')}</Text>
         <Pressable style={styles.more} onPress={() => router.navigate('/records')} hitSlop={8}>
           <Text style={styles.moreText}>{t('home.seeAll')}</Text>
-          <ChevronRight size={16} color={colors.sub} strokeWidth={1.8} />
+          <ChevronRight size={16} color={c.sub} strokeWidth={1.8} />
         </Pressable>
       </View>
 
       <View style={[styles.row, styles.headerRow]}>
-        {[t('home.colMeal'), t('home.colKcal'), t('home.colCarbs'), t('home.colProtein'), t('home.colFat')].map(
-          (h, i) => (
-            <Text key={h} style={[styles.th, i === 0 && styles.first]}>
-              {h}
-            </Text>
-          ),
-        )}
+        <Text style={[styles.th, styles.first]}>{t('home.colMeal')}</Text>
+        {heads.map((h) => (
+          <Text key={h} style={styles.th}>
+            {h}
+          </Text>
+        ))}
       </View>
 
       {data.meals.map((m) => {
         const ai = m.log?.ai;
-        const p = m.log?.portion ?? 1;
+        const p = eatenFactor(m.log?.portion ?? 1, m.log?.sharedMeal); // 먹은 양 × 나눠 먹음(0.5), 오늘 합계와 같은 계산
+        const missed = !ai && m.state === 'missed';
         const vals = ai
           ? [roundKcal(ai.kcal * p), roundGram(ai.carbs * p), roundGram(ai.protein * p), roundGram(ai.fat * p)]
-          : [goal.kcal, goal.carbs, goal.protein, goal.fat];
-        const muted = !ai;
+          : missed
+            ? null
+            : [roundKcal(goal.kcal), goal.carbs, goal.protein, goal.fat];
+        const label = ai
+          ? t('common.meal', { n: m.index })
+          : missed
+            ? t('home.missedMeal', { n: m.index })
+            : t('home.planned', { n: m.index });
         return (
           <View key={m.index} style={styles.row}>
-            <View style={styles.first}>
-              <Text style={styles.meal}>{t('common.meal', { n: m.index })}</Text>
-              {muted ? <Text style={styles.targetTag}>{t('home.target')}</Text> : null}
-            </View>
-            {vals.map((v, i) => (
-              <Text key={i} style={[styles.td, muted && styles.muted]}>
-                {v}
+            <Text
+              style={[styles.first, styles.meal, !ai && styles.mealMuted, missed && styles.faint]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+            {(vals ?? [null, null, null, null]).map((v, i) => (
+              <Text key={i} style={[styles.td, !ai && styles.muted, missed && styles.faint]}>
+                {v === null ? '-' : formatNumber(v)}
               </Text>
             ))}
           </View>
         );
       })}
-    </Card>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: { paddingHorizontal: space.m - 4, paddingTop: space.m, paddingBottom: space.s },
-  head: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: space.s,
-    marginBottom: space.s,
-  },
-  title: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },
-  more: { flexDirection: 'row', alignItems: 'center' },
-  moreText: { fontFamily: fonts.regular, fontSize: 13, color: colors.sub },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 36,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
-  },
-  headerRow: { minHeight: 30, borderTopWidth: 0 },
-  th: { flex: 1, textAlign: 'center', fontFamily: fonts.regular, fontSize: 12, color: colors.sub },
-  first: { flex: 0.75, textAlign: 'left', paddingLeft: space.s + 5 },
-  meal: { fontFamily: fonts.bold, fontSize: 14, color: colors.text },
-  targetTag: { fontFamily: fonts.regular, fontSize: 11, color: colors.sub },
-  td: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.text,
-    fontVariant: ['tabular-nums'],
-  },
-  muted: { color: colors.faint },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    // 시안 실측: 위 13, 아래 9, 행 간격 37.5
+    card: {
+      backgroundColor: c.card,
+      borderRadius: radius.block,
+      paddingHorizontal: layout.cardPad,
+      paddingTop: 13,
+      paddingBottom: 9,
+    },
+    head: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: layout.titleGap,
+    },
+    title: { fontFamily: fonts.semibold, fontSize: 20, lineHeight: 26, color: c.text },
+    more: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    moreText: { fontFamily: fonts.regular, fontSize: 14, color: c.sub },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 37.5, // 시안 행 간격
+      borderTopWidth: layout.hairline,
+      borderTopColor: c.line,
+    },
+    headerRow: { minHeight: 0, paddingBottom: 6, borderTopWidth: 0 },
+    th: {
+      flex: 1,
+      textAlign: 'right',
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: c.sub,
+    },
+    first: { flex: 1.5, textAlign: 'left' },
+    meal: { fontFamily: fonts.semibold, fontSize: 15, color: c.text },
+    mealMuted: { fontFamily: fonts.medium, color: c.sub },
+    td: {
+      flex: 1,
+      textAlign: 'right',
+      fontFamily: fonts.regular,
+      fontSize: 15,
+      color: c.text,
+      fontVariant: ['tabular-nums'],
+    },
+    muted: { color: c.sub },
+    faint: { color: c.faint },
+  });

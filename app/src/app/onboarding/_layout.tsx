@@ -1,7 +1,8 @@
 import { Stack } from 'expo-router';
 
-import { colors } from '../../ui/tokens';
+import { usePalette } from '../../ui/theme';
 
 export default function OnboardingLayout() {
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />;
+  const c = usePalette();
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />;
 }

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "fitdoing",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#F2F4F6",
     "ios": {
       "bundleIdentifier": "com.fitdoing.app"
@@ -54,7 +54,9 @@
         {
           "locationWhenInUsePermission": "헬스장 위치를 정하고 도착을 확인할 때 위치를 써요. 위치는 폰에만 저장돼요."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

@@ -12,7 +12,8 @@ import {
 import { fromMinutes, toMinutes } from '../domain/time';
 import { BottomSheet } from './BottomSheet';
 import { FullButton } from './FullButton';
-import { colors, fonts, radius, space } from './tokens';
+import { useThemedStyles, type Palette } from './theme';
+import { fonts, radius } from './tokens';
 
 const ITEM = 44;
 const VISIBLE = 5;
@@ -30,6 +31,7 @@ interface Props {
 /** 시·분(5분 단위) 휠을 담은 바텀시트 */
 export function TimeSheet({ visible, title, value, onClose, onConfirm }: Props) {
   const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const [h, setH] = useState(0);
   const [m, setM] = useState(0);
 
@@ -49,9 +51,9 @@ export function TimeSheet({ visible, title, value, onClose, onConfirm }: Props) 
     <BottomSheet visible={visible} onClose={onClose} title={title ?? t('timeSheet.title')}>
       <View style={styles.wheels}>
         <View pointerEvents="none" style={styles.band} />
-        <Wheel items={HOURS} value={h} onChange={setH} visible={visible} />
+        <Wheel items={HOURS} value={h} onChange={setH} visible={visible} styles={styles} />
         <Text style={styles.colon}>:</Text>
-        <Wheel items={MINUTES} value={m} onChange={setM} visible={visible} />
+        <Wheel items={MINUTES} value={m} onChange={setM} visible={visible} styles={styles} />
       </View>
       <FullButton label={t('common.done')} onPress={() => onConfirm(fromMinutes(h * 60 + m))} />
     </BottomSheet>
@@ -63,11 +65,13 @@ function Wheel({
   value,
   onChange,
   visible,
+  styles,
 }: {
   items: number[];
   value: number;
   onChange: (v: number) => void;
   visible: boolean;
+  styles: ReturnType<typeof makeStyles>;
 }) {
   const ref = useRef<ScrollView>(null);
   const idx = Math.max(0, items.indexOf(value));
@@ -104,26 +108,27 @@ function Wheel({
   );
 }
 
-const styles = StyleSheet.create({
-  wheels: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: ITEM * VISIBLE,
-    marginBottom: space.l,
-  },
-  band: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: ITEM * Math.floor(VISIBLE / 2),
-    height: ITEM,
-    borderRadius: radius.tile,
-    backgroundColor: colors.bg,
-  },
-  wheel: { width: 88, height: ITEM * VISIBLE, flexGrow: 0 },
-  item: { height: ITEM, alignItems: 'center', justifyContent: 'center' },
-  itemText: { fontFamily: fonts.medium, fontSize: 22, color: colors.faint, fontVariant: ['tabular-nums'] },
-  itemOn: { color: colors.text, fontFamily: fonts.bold },
-  colon: { fontFamily: fonts.bold, fontSize: 22, color: colors.text, marginHorizontal: space.s },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    wheels: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: ITEM * VISIBLE,
+      marginBottom: 24,
+    },
+    band: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: ITEM * Math.floor(VISIBLE / 2),
+      height: ITEM,
+      borderRadius: radius.field,
+      backgroundColor: c.selected,
+    },
+    wheel: { width: 88, height: ITEM * VISIBLE, flexGrow: 0 },
+    item: { height: ITEM, alignItems: 'center', justifyContent: 'center' },
+    itemText: { fontFamily: fonts.medium, fontSize: 22, color: c.faint, fontVariant: ['tabular-nums'] },
+    itemOn: { color: c.text, fontFamily: fonts.bold },
+    colon: { fontFamily: fonts.bold, fontSize: 22, color: c.text, marginHorizontal: 8 },
+  });

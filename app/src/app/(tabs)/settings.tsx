@@ -1,17 +1,24 @@
 import { router, type Href } from 'expo-router';
-import { Fragment, useState, type ReactNode } from 'react';
+import { ChevronRight, UserRound } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatNumber } from '../../domain/format';
 import { useSyncStatus } from '../../features/api/store';
+import { deleteAccountAndData, logout } from '../../features/auth/account';
 import { CouponSheet } from '../../features/coupons/CouponSheet';
+import { useCouponStatus } from '../../features/coupons/useCoupons';
+import { askToEnableNotifications } from '../../features/settings/notifications';
 import { useSettings, useSettingsValue } from '../../features/settings/store';
-import { Card, Divider } from '../../ui/Card';
+import { ThemeSheet } from '../../features/settings/ThemeSheet';
+import { SectionLabel } from '../../ui/Card';
+import { useTabBarSpace } from '../../ui/FloatingTabBar';
 import { ListRow } from '../../ui/ListRow';
+import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
 import { Toggle } from '../../ui/Toggle';
-import { colors, fonts, space, type } from '../../ui/tokens';
+import { fonts, layout, text } from '../../ui/tokens';
 
 const formatDateTime = (ms: number) => {
   const d = new Date(ms);
@@ -19,30 +26,57 @@ const formatDateTime = (ms: number) => {
   return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-type Wd = '0' | '1' | '2' | '3' | '4' | '5' | '6';
-
-function Section({ title, note, children }: { title: string; note?: string; children: ReactNode[] }) {
+/** 섹션 이름 + 박스 없는 행들 (+ 아래 작은 안내) */
+function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  const styles = useThemedStyles(makeStyles);
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Card style={styles.card}>
-        {children.map((c, i) => (
-          <Fragment key={i}>
-            {i > 0 ? <Divider /> : null}
-            {c}
-          </Fragment>
-        ))}
-      </Card>
+    <View>
+      <SectionLabel>{title}</SectionLabel>
+      {children}
       {note ? <Text style={styles.note}>{note}</Text> : null}
     </View>
   );
 }
 
+/** 맨 위 프로필 줄: 동그라미(닉네임 첫 글자, 없으면 사람 아이콘) · 닉네임 · "내 프로필" · 화살표 */
+function ProfileRow({ nickname, onPress }: { nickname: string; onPress: () => void }) {
+  const { t } = useTranslation();
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
+  const initial = Array.from(nickname.trim())[0]?.toUpperCase();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.profile, pressed && styles.pressed]}
+    >
+      <View style={styles.avatar}>
+        {initial ? (
+          <Text style={styles.avatarText}>{initial}</Text>
+        ) : (
+          <UserRound size={26} color={c.sub} strokeWidth={1.8} />
+        )}
+      </View>
+      <View style={styles.profileText}>
+        <Text style={[styles.profileName, !nickname && styles.profileEmpty]}>
+          {nickname || t('settings.nicknameEmpty')}
+        </Text>
+        <Text style={styles.profileSub}>{t('settings.myProfile')}</Text>
+      </View>
+      <ChevronRight size={20} color={c.sub} strokeWidth={1.8} />
+    </Pressable>
+  );
+}
+
 export default function SettingsScreen() {
   const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
+  const tabSpace = useTabBarSpace(); // 떠 있는 탭바에 마지막 내용이 가리지 않게
   const s = useSettingsValue();
   const update = useSettings((st) => st.update);
+  const coupons = useCouponStatus();
   const [couponOpen, setCouponOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
   const syncPending = useSyncStatus((st) => st.pending);
   const lastSyncAt = useSyncStatus((st) => st.lastSyncAt);
   const syncValue =
@@ -53,106 +87,158 @@ export default function SettingsScreen() {
         : t('sync.never');
   const go = (href: Href) => () => router.push(href);
 
+  const confirmLogout = () =>
+    Alert.alert(t('settings.logoutTitle'), t('settings.logoutBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('settings.logout'), onPress: () => void logout() },
+    ]);
+  // 서버의 계정·백업이 지워지고 되돌릴 수 없으니, 그 사실을 본문에 적고 한 번 더 묻는다.
+  const confirmDelete = () =>
+    Alert.alert(t('settings.deleteTitle'), t('settings.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('settings.deleteConfirm'),
+        style: 'destructive',
+        onPress: () =>
+          deleteAccountAndData().catch((e) => {
+            console.warn('delete account failed', e);
+            Alert.alert(t('settings.deleteFailed'));
+          }),
+      },
+    ]);
+
   const modeLabel = { mild: t('settings.modeMild'), normal: t('settings.modeNormal'), spicy: t('settings.modeSpicy') }[
     s.mode
   ];
-  const gymDays = s.gym.days.map((d) => t(`weekdayShort.${String(d) as Wd}`)).join(' ');
+  const couponsLeft = coupons.rest.left + coupons.cheat.left;
+
+  // 켤 때 알림 권한이 없으면 묻는다. 허용하지 않으면 꺼진 채로 둔다.
+  const toggleNotifications = async (on: boolean) => {
+    if (on && !(await askToEnableNotifications())) return;
+    update({ notifications: on });
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.title}>{t('settings.title')}</Text>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: tabSpace + layout.block }]}>
+        <View>
+          <Text style={styles.title}>{t('settings.title')}</Text>
+          <ProfileRow nickname={s.nickname} onPress={go('/edit/profile')} />
+        </View>
 
-        <Section title={t('settings.sectionRecord')}>
-          {[
-            <ListRow key="mode" label={t('settings.mode')} value={modeLabel} onPress={go('/edit/mode')} />,
-            <ListRow
-              key="meals"
-              label={t('settings.meals')}
-              value={t('settings.mealsValue', { n: s.meals.length })}
-              sub={s.meals.map((m) => m.deadline).join(' · ')}
-              onPress={go('/edit/meals')}
-            />,
-            <ListRow
-              key="targets"
-              label={t('settings.targets')}
-              value={`${formatNumber(s.targets.kcal)} ${t('common.kcal')}`}
-              onPress={go('/edit/targets')}
-            />,
-          ]}
+        <Section title={t('settings.sectionPlan')}>
+          <ListRow label={t('settings.profile')} value={t(`goal.${s.goal}`)} onPress={go('/edit/profile')} />
+          <ListRow
+            label={t('settings.meals')}
+            value={t('settings.mealsPerDay', { n: s.meals.length })}
+            onPress={go('/edit/meals')}
+          />
+          <ListRow
+            label={t('settings.gym')}
+            value={
+              s.gym.enabled ? t('settings.gymValue', { n: s.gym.weeklyTarget, time: s.gym.arriveBy }) : t('common.off')
+            }
+            onPress={go('/edit/gym')}
+          />
+          <ListRow
+            label={t('settings.sleep')}
+            value={s.sleep.enabled ? `${s.sleep.bedTime} · ${s.sleep.wakeTime}` : t('common.off')}
+            onPress={go('/edit/sleep')}
+          />
+          <ListRow label={t('settings.mode')} value={modeLabel} onPress={go('/edit/mode')} />
+          <ListRow
+            label={t('settings.targets')}
+            value={`${formatNumber(s.targets.kcal)} ${t('common.kcal')}`}
+            onPress={go('/edit/targets')}
+          />
         </Section>
 
-        <Section title={t('settings.sectionHabit')}>
-          {[
-            <ListRow
-              key="gym"
-              label={t('settings.gym')}
-              value={s.gym.enabled ? `${gymDays} · ${s.gym.arriveBy}` : t('common.off')}
-              sub={s.gym.enabled ? s.gym.name : undefined}
-              onPress={go('/edit/gym')}
-            />,
-            <ListRow
-              key="sleep"
-              label={t('settings.sleep')}
-              value={s.sleep.enabled ? `${s.sleep.bedTime} → ${s.sleep.wakeTime}` : t('common.off')}
-              onPress={go('/edit/sleep')}
-            />,
-          ]}
-        </Section>
-
-        <Section title={t('settings.sectionProfile')}>
-          {[
-            <ListRow
-              key="profile"
-              label={t('settings.profile')}
-              value={`${t(`goal.${s.goal}`)} · ${s.heightCm}cm · ${s.weightKg}kg`}
-              onPress={go('/edit/profile')}
-            />,
-          ]}
-        </Section>
-
-        {/* 잠금 관련 값은 잠금 기능(Phase 3~4)과 함께 편집을 연다. 지금은 값만 보여준다. */}
+        {/* 잠금 관련 값은 잠금 기능과 함께 편집을 연다. 지금은 값만 보여준다. */}
         <Section title={t('settings.sectionLock')} note={t('settings.lockSoon')}>
-          {[
-            <ListRow key="lock" disabled label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />,
-            <ListRow
-              key="emergency"
-              disabled
-              label={t('settings.emergency')}
-              value={t('settings.emergencyValue', { n: s.emergencyPerWeek })}
-            />,
-            <ListRow
-              key="coupons"
-              onPress={() => setCouponOpen(true)}
-              label={t('settings.coupons')}
-              value={t('settings.couponsValue', { rest: s.coupons.rest, cheat: s.coupons.cheat })}
-            />,
-            <ListRow key="apps" disabled label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />,
-          ]}
+          <ListRow disabled label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />
+          <ListRow
+            disabled
+            label={t('settings.emergency')}
+            value={t('settings.emergencyValue', { n: s.emergencyPerWeek })}
+          />
+          <ListRow disabled label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />
         </Section>
 
-        <Section title={t('settings.sectionPrivacy')} note={`${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}`}>
-          {[
-            <ListRow
-              key="backup"
-              label={t('settings.photoBackup')}
-              right={<Toggle value={s.photoBackup} onChange={(photoBackup) => update({ photoBackup })} />}
-            />,
-            <ListRow key="sync" disabled label={t('sync.title')} value={syncValue} />,
-          ]}
+        <Section
+          title={t('settings.sectionApp')}
+          note={`${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}`}
+        >
+          <ListRow
+            label={t('settings.coupons')}
+            value={t('settings.couponsLeft', { n: couponsLeft })}
+            onPress={() => setCouponOpen(true)}
+          />
+          <ListRow label={t('settings.friendsManage')} onPress={go('/friends-manage' as Href)} />
+          <ListRow label={t('share.title')} onPress={go('/share-page' as Href)} />
+          <ListRow
+            label={t('settings.shareFriends')}
+            desc={t('settings.shareFriendsDesc')}
+            right={<Toggle value={s.shareFriends} onChange={(shareFriends) => update({ shareFriends })} />}
+          />
+          <ListRow
+            label={t('settings.themeMode')}
+            value={t(`settings.theme_${s.themeMode}`)}
+            onPress={() => setThemeOpen(true)}
+          />
+          <ListRow
+            label={t('settings.notifications')}
+            desc={t('settings.notificationsDesc')}
+            right={<Toggle value={s.notifications} onChange={(on) => void toggleNotifications(on)} />}
+          />
+          <ListRow
+            label={t('settings.photoBackup')}
+            right={<Toggle value={s.photoBackup} onChange={(photoBackup) => update({ photoBackup })} />}
+          />
+          <ListRow disabled label={t('sync.title')} value={syncValue} />
+        </Section>
+
+        <Section title={t('settings.sectionAccount')}>
+          <ListRow label={t('settings.logout')} onPress={confirmLogout} />
+          <ListRow label={t('settings.deleteAccount')} onPress={confirmDelete} />
         </Section>
       </ScrollView>
       <CouponSheet visible={couponOpen} onClose={() => setCouponOpen(false)} />
+      <ThemeSheet
+        visible={themeOpen}
+        value={s.themeMode}
+        onClose={() => setThemeOpen(false)}
+        onSave={(themeMode) => {
+          update({ themeMode });
+          setThemeOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  body: { paddingHorizontal: space.gutter, paddingBottom: space.xl },
-  title: { ...type.title, marginTop: space.l, marginBottom: space.s },
-  section: { marginTop: space.l, gap: space.s },
-  sectionTitle: { fontFamily: fonts.medium, fontSize: 15, color: colors.sub, marginLeft: space.xs },
-  card: { paddingVertical: space.xs },
-  note: { ...type.caption, marginHorizontal: space.xs },
-});
+const AVATAR = 56;
+
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    body: { paddingHorizontal: layout.page, gap: layout.block },
+    title: { ...text.title, color: c.text, marginTop: 20 },
+    note: { ...text.caption, color: c.sub, marginTop: 4 },
+    pressed: { opacity: 0.6 },
+    profile: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20, paddingVertical: 8 },
+    avatar: {
+      width: AVATAR,
+      height: AVATAR,
+      borderRadius: AVATAR / 2,
+      backgroundColor: c.card,
+      borderWidth: layout.hairline,
+      borderColor: c.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { ...text.heading, fontSize: 22, lineHeight: 28, color: c.text },
+    profileText: { flex: 1, gap: 2 },
+    profileName: { ...text.heading, color: c.text },
+    profileEmpty: { fontFamily: fonts.regular, color: c.sub },
+    profileSub: { ...text.caption, color: c.sub },
+  });

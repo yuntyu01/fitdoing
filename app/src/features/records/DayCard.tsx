@@ -1,106 +1,138 @@
-import { Dumbbell, Lock, Moon } from 'lucide-react-native';
+import { ChevronRight, Utensils } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { formatNumber, roundGram, roundKcal } from '../../domain/format';
 import type { DayDetail } from '../../domain/records';
-import { parseDateKey } from '../../domain/time';
-import type { Targets } from '../../domain/targets';
-import { Card } from '../../ui/Card';
-import { colors, fonts, radius, space, tabular, type } from '../../ui/tokens';
+import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
+import { fonts, layout, radius, text } from '../../ui/tokens';
+import { clock, eatenFoodNames, fullDate, kcalText, macroText, type MealRow } from './format';
 
-export function DayCard({ detail, targets }: { detail: DayDetail; targets: Targets }) {
+const THUMB = 60;
+
+/**
+ * 달력에서 고른 날 (상자 없음): 날짜 제목 + 오른쪽 상태, 요약 한 줄, 합계 한 줄, 기록한 끼니 줄(사진·끼니·시각·음식 이름).
+ * 끼니 줄을 누르면 하루 상세로 간다.
+ */
+export function DayCard({
+  detail,
+  meals,
+  isToday,
+  onOpen,
+}: {
+  detail: DayDetail;
+  meals: MealRow[]; // 그날 기록한 끼니 (1끼부터)
+  isToday: boolean;
+  onOpen: () => void;
+}) {
   const { t } = useTranslation();
-  const d = parseDateKey(detail.date);
-  const wd = String((d.getDay() + 6) % 7) as '0';
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
   const { totals } = detail;
 
+  const status = isToday ? t('records.inProgress') : detail.state === 'full' ? t('records.dayDone') : null;
+  const summary = [
+    meals.length > 0 ? t('records.mealsLogged', { n: meals.length }) : null,
+    detail.gym ? t('records.gymDone') : null,
+    detail.locked ? t('records.lockedYes') : null,
+    detail.sleep ? t('records.sleepDone') : null,
+  ].filter(Boolean);
+
   return (
-    <Card>
-      <Text style={type.heading}>
-        {t('date.full', { month: d.getMonth() + 1, day: d.getDate(), weekday: t(`weekdayLong.${wd}`) })}
-      </Text>
+    <View>
+      <View style={styles.head}>
+        <Text style={styles.date}>{fullDate(t, detail.date)}</Text>
+        {status ? <Text style={styles.status}>{status}</Text> : null}
+      </View>
 
       {detail.empty ? (
-        <Text style={[type.desc, styles.empty]}>{t('records.dayEmpty')}</Text>
+        <Text style={styles.empty}>{t('records.dayEmpty')}</Text>
       ) : (
-        <>
-          <View style={styles.kcalRow}>
-            <Text style={type.desc}>{t('home.kcalLabel')}</Text>
-            <Text style={styles.kcal}>
-              <Text style={styles.kcalNum}>{formatNumber(roundKcal(totals.kcal))}</Text> / {formatNumber(targets.kcal)}{' '}
-              {t('common.kcal')}
+        <View style={styles.lines}>
+          <Text style={styles.summary}>{summary.join(' · ')}</Text>
+          {meals.length > 0 ? (
+            <Text style={styles.totals}>
+              <Text style={styles.kcal}>
+                {kcalText(totals.kcal)} {t('common.kcal')}
+              </Text>
+              {` · ${macroText(t, totals)}`}
             </Text>
-          </View>
-          <View style={styles.macros}>
-            <Macro label={t('home.carbs')} v={totals.carbs} target={targets.carbs} />
-            <Macro label={t('home.protein')} v={totals.protein} target={targets.protein} />
-            <Macro label={t('home.fat')} v={totals.fat} target={targets.fat} />
-          </View>
-
-          <View style={styles.thumbs}>
-            {detail.meals.map((m) => (
-              <View key={m.index} style={styles.thumbCol}>
-                <View style={styles.thumb}>
-                  {m.photoUri ? <Image source={{ uri: m.photoUri }} style={styles.img} /> : null}
-                </View>
-                <Text style={styles.thumbLabel}>{t('common.meal', { n: m.index })}</Text>
-              </View>
-            ))}
-          </View>
-        </>
+          ) : null}
+        </View>
       )}
 
-      <View style={styles.flags}>
-        <Flag icon={<Dumbbell size={18} color={detail.gym ? colors.text : colors.faint} strokeWidth={1.8} />} on={detail.gym} label={detail.gym ? t('records.gymDone') : t('records.gymNone')} />
-        <Flag icon={<Lock size={18} color={detail.locked ? colors.text : colors.faint} strokeWidth={1.8} />} on={detail.locked} label={detail.locked ? t('records.lockedYes') : t('records.lockedNo')} />
-        {detail.sleep ? <Flag icon={<Moon size={18} color={colors.text} strokeWidth={1.8} />} on label={t('records.sleepDone')} /> : null}
-      </View>
-    </Card>
-  );
-}
-
-function Macro({ label, v, target }: { label: string; v: number; target: number }) {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.macro}>
-      <Text style={type.caption}>{label}</Text>
-      <Text style={styles.macroVal}>
-        {roundGram(v)}
-        <Text style={styles.macroTarget}>
-          {' '}
-          / {target}
-          {t('common.gram')}
-        </Text>
-      </Text>
+      {meals.length > 0 ? (
+        <View style={styles.list}>
+          {meals.map((m) => {
+            const foods = eatenFoodNames(t, m); // 음식별 먹은 양이 100%가 아니면 "현미밥 75%"
+            return (
+              <Pressable
+                key={m.index}
+                onPress={onOpen}
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                accessibilityRole="button"
+              >
+                <View style={styles.thumb}>
+                  {m.photoUri ? (
+                    <Image
+                      source={{ uri: m.photoUri }}
+                      style={styles.img}
+                      accessibilityLabel={t('records.mealPhoto', { n: m.index })}
+                    />
+                  ) : (
+                    <Utensils size={20} color={c.faint} strokeWidth={1.8} />
+                  )}
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.meta}>
+                    {[t('common.meal', { n: m.index }), clock(m.loggedAt)].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Text style={[styles.foods, !foods && styles.foodsMuted]} numberOfLines={2}>
+                    {foods ?? t('records.noItems')}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={c.sub} strokeWidth={1.8} />
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : !detail.empty ? (
+        // 끼니 기록은 없어도 헬스·잠금 기록은 하루 상세에서 볼 수 있게
+        <Pressable onPress={onOpen} style={({ pressed }) => [styles.open, pressed && styles.pressed]} hitSlop={8}>
+          <Text style={styles.openText}>{t('records.openDay')}</Text>
+          <ChevronRight size={16} color={c.sub} strokeWidth={1.8} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
-function Flag({ icon, on, label }: { icon: React.ReactNode; on: boolean; label: string }) {
-  return (
-    <View style={styles.flag}>
-      {icon}
-      <Text style={[styles.flagText, !on && { color: colors.faint }]}>{label}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  empty: { marginTop: space.s },
-  kcalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: space.m },
-  kcal: { fontFamily: fonts.regular, fontSize: 15, color: colors.sub, ...tabular },
-  kcalNum: { fontFamily: fonts.bold, fontSize: 22, color: colors.text, ...tabular },
-  macros: { flexDirection: 'row', marginTop: space.m, gap: space.gap },
-  macro: { flex: 1, gap: 2 },
-  macroVal: { fontFamily: fonts.bold, fontSize: 17, color: colors.text, ...tabular },
-  macroTarget: { fontFamily: fonts.regular, fontSize: 13, color: colors.sub },
-  thumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, marginTop: space.l },
-  thumbCol: { alignItems: 'center', gap: 4, width: 56 },
-  thumb: { width: 56, height: 56, borderRadius: radius.tile - 4, backgroundColor: colors.bg, overflow: 'hidden' },
-  img: { width: '100%', height: '100%' },
-  thumbLabel: { ...type.caption, fontSize: 12 },
-  flags: { gap: space.s, marginTop: space.l },
-  flag: { flexDirection: 'row', alignItems: 'center', gap: space.s },
-  flagText: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: layout.related },
+    date: { ...text.heading, fontSize: 20, lineHeight: 28, fontFamily: fonts.bold, color: c.text, flexShrink: 1 },
+    status: { ...text.caption, color: c.sub },
+    empty: { ...text.body, color: c.sub, marginTop: layout.related },
+    lines: { marginTop: layout.related, gap: 4 },
+    summary: { ...text.body, color: c.text },
+    totals: { ...text.body, color: c.sub, fontVariant: ['tabular-nums'] },
+    kcal: { fontFamily: fonts.semibold, color: c.text },
+    list: { marginTop: layout.inner, gap: 4 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6 },
+    pressed: { opacity: 0.6 },
+    thumb: {
+      width: THUMB,
+      height: THUMB,
+      borderRadius: radius.field,
+      backgroundColor: c.card,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    img: { width: '100%', height: '100%' },
+    rowText: { flex: 1, gap: 2 },
+    meta: { ...text.caption, color: c.sub, fontVariant: ['tabular-nums'] },
+    foods: { ...text.label, color: c.text },
+    foodsMuted: { color: c.sub },
+    open: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: layout.inner, alignSelf: 'flex-start' },
+    openText: { ...text.body, color: c.sub },
+  });

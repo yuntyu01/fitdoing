@@ -5,7 +5,8 @@ import { useMemo } from 'react';
 import { db } from '../../db/client';
 import { gymLogs, lockEvents, mealLogs, sleepLogs } from '../../db/schema';
 import { monthGrid, monthRange, monthSummary, type YearMonth } from '../../domain/calendar';
-import { buildMonthFacts, type MealLogRow } from '../../domain/records';
+import { buildMonthFacts } from '../../domain/records';
+import type { MealRow } from './format';
 
 /** /api/records/month 와 같은 의미를 로컬 SQLite에서 읽는다. 기록이 바뀌면 자동 갱신. */
 export function useMonthRecords(ym: YearMonth, mealsPlanned: number) {
@@ -15,7 +16,10 @@ export function useMonthRecords(ym: YearMonth, mealsPlanned: number) {
   const deps = [start, end];
 
   const { data: meals } = useLiveQuery(
-    db.select().from(mealLogs).where(and(gte(mealLogs.date, start), lte(mealLogs.date, end))),
+    db
+      .select()
+      .from(mealLogs)
+      .where(and(gte(mealLogs.date, start), lte(mealLogs.date, end))),
     deps,
   );
   const { data: gym } = useLiveQuery(
@@ -33,7 +37,10 @@ export function useMonthRecords(ym: YearMonth, mealsPlanned: number) {
     deps,
   );
   const { data: locks } = useLiveQuery(
-    db.select().from(lockEvents).where(and(gte(lockEvents.startedAt, startMs), lte(lockEvents.startedAt, endMs - 1))),
+    db
+      .select()
+      .from(lockEvents)
+      .where(and(gte(lockEvents.startedAt, startMs), lte(lockEvents.startedAt, endMs - 1))),
     [startMs, endMs],
   );
 
@@ -48,7 +55,7 @@ export function useMonthRecords(ym: YearMonth, mealsPlanned: number) {
       sleepDates: sleep.map((s) => s.date),
       lockStartedAt: locks.map((l) => l.startedAt),
     });
-    const logs: MealLogRow[] = meals;
+    const logs: MealRow[] = meals; // 하루 블록이 사진·기록 시각·음식 이름까지 쓴다
     return { weeks, facts: new Map(facts.map((f) => [f.date, f])), summary: monthSummary(facts), logs, list: facts };
   }, [ym, mealsPlanned, meals, gym, sleep, locks]);
 }

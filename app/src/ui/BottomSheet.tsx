@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Dimensions, Keyboard, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, space, type } from './tokens';
+import { usePalette, useThemedStyles, type Palette } from './theme';
+import { layout, text } from './tokens';
 
 interface Props {
   visible: boolean;
@@ -11,8 +13,10 @@ interface Props {
   children: ReactNode;
 }
 
-/** 바탕은 서서히 어두워지고 시트는 아래에서 올라온다. */
+/** 바탕은 서서히 어두워지고 시트는 아래에서 올라온다. 손잡이 + 제목 + 닫기(X). 닫으면(바깥·X·뒤로) 바꾼 값은 버린다. */
 export function BottomSheet({ visible, onClose, title, children }: Props) {
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
   const [anim] = useState(() => new Animated.Value(0));
@@ -45,13 +49,20 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
           style={[
             styles.sheet,
             // Modal 안에서는 adjustResize가 안 먹으므로 키보드 높이만큼 직접 올린다.
-            { bottom: keyboard, paddingBottom: (keyboard ? space.m : insets.bottom) + space.m, transform: [{ translateY }] },
+            { bottom: keyboard, paddingBottom: (keyboard ? 12 : insets.bottom) + 16, transform: [{ translateY }] },
           ]}
         >
           {/* 입력 밖을 누르면 키보드를 내린다 */}
           <Pressable onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.handle} />
-            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {title ? (
+              <View style={styles.head}>
+                <Text style={styles.title}>{title}</Text>
+                <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="close">
+                  <X size={24} color={c.text} strokeWidth={1.8} />
+                </Pressable>
+              </View>
+            ) : null}
             {children}
           </Pressable>
         </Animated.View>
@@ -76,26 +87,28 @@ function useKeyboardHeight(): number {
   return h;
 }
 
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  backdrop: { backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: space.gutter,
-    paddingTop: space.s,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.line,
-    marginBottom: space.m,
-  },
-  title: { ...type.heading, marginBottom: space.m },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    fill: { flex: 1 },
+    backdrop: { backgroundColor: c.scrim },
+    sheet: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      backgroundColor: c.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: layout.page,
+      paddingTop: 8,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.border,
+      marginBottom: 16,
+    },
+    head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
+    title: { ...text.title, fontSize: 22, lineHeight: 28, color: c.text, flexShrink: 1 },
+  });

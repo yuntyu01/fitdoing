@@ -1,4 +1,4 @@
-import { applyPortion, baseName, cleanBarcode, photoFileName, pickMealIndex, resizeTarget, sanitizeAi, toMealBackup } from './logging';
+import { applyPortion, baseName, cleanBarcode, photoFileName, pickMealIndex, resizeTarget, sanitizeAi, sanitizeItem, toMealBackup } from './logging';
 
 const m = (index: number, state: 'logged' | 'current' | 'upcoming' | 'missed') => ({ index, state });
 
@@ -21,12 +21,32 @@ describe('applyPortion', () => {
   it('먹은 비율을 곱한다', () => {
     expect(applyPortion({ kcal: 800, carbs: 100, protein: 40, fat: 20 }, 0.25)).toEqual({ kcal: 200, carbs: 25, protein: 10, fat: 5 });
   });
+  it('곱빼기·2인분은 1인분보다 크게 곱한다', () => {
+    expect(applyPortion({ kcal: 600, carbs: 130, protein: 10, fat: 2 }, 2)).toEqual({ kcal: 1200, carbs: 260, protein: 20, fat: 4 });
+    expect(applyPortion({ kcal: 600, carbs: 130, protein: 10, fat: 2 }, 1.5, true)).toEqual({ kcal: 450, carbs: 97.5, protein: 7.5, fat: 1.5 });
+  });
 });
 
 describe('sanitizeAi', () => {
   it('빈 이름을 버리고 숫자를 정수·0 이상으로 맞춘다', () => {
     const r = sanitizeAi({ items: [{ name: ' 밥 ', amount: ' 1공기 ' }, { name: ' ', amount: '' }], kcal: 300.6, carbs: -1, protein: NaN, fat: 4.4, confidence: 2 });
-    expect(r).toEqual({ items: [{ name: '밥', amount: '1공기' }], kcal: 301, carbs: 0, protein: 0, fat: 4, confidence: 1 });
+    expect(r).toEqual({ items: [{ name: '밥', amount: '1공기', kcal: null, carbs: null, protein: null, fat: null, portion: null }], kcal: 301, carbs: 0, protein: 0, fat: 4, confidence: 1 });
+  });
+});
+
+describe('sanitizeItem', () => {
+  it('음식별 숫자는 0 이상 정수로, 없으면 null', () => {
+    expect(sanitizeItem({ name: ' 밥 ', amount: '1공기', kcal: 300.4, carbs: -2, protein: Number.NaN })).toEqual({
+      name: '밥',
+      amount: '1공기',
+      kcal: 300,
+      carbs: 0,
+      protein: null,
+      fat: null,
+      portion: null,
+    });
+    expect(sanitizeItem({ name: '밥', amount: '1공기', portion: 0.75 }).portion).toBe(0.75);
+    expect(sanitizeItem({ name: '밥', amount: '1공기', portion: 0.3 }).portion).toBeNull();
   });
 });
 

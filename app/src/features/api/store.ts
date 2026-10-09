@@ -1,41 +1,13 @@
-import { randomUUID } from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 
 import { create } from 'zustand';
 
 import { enqueueAll, removeSent, type QueueItem } from '../../domain/sync';
 
-// 기기 id와 재시도 큐는 앱 문서 디렉터리의 작은 파일로 둔다.
+// 재시도 큐와 동기화 메타는 앱 문서 디렉터리의 작은 파일로 둔다.
 // (잠금·기록의 진실은 로컬 SQLite이고, 이 둘은 서버 백업용 부가 정보라 스키마를 늘리지 않는다.)
 
-const deviceFile = () => new File(Paths.document, 'device-id.txt');
 const queueFile = () => new File(Paths.document, 'sync-queue.json');
-
-let cachedId: string | null = null;
-
-/** 최초 1회 uuid를 만들어 보관한다. 계정 없이 기기 단위로 서버 데이터를 나누는 키. */
-export async function getDeviceId(): Promise<string> {
-  if (cachedId) return cachedId;
-  try {
-    const f = deviceFile();
-    if (f.exists) {
-      const v = (await f.text()).trim();
-      if (v) return (cachedId = v);
-    }
-  } catch {
-    // 읽기에 실패하면 새로 만든다.
-  }
-  const id = randomUUID();
-  cachedId = id;
-  try {
-    const f = deviceFile();
-    f.create({ overwrite: true });
-    f.write(id);
-  } catch (e) {
-    console.warn('device id save failed', e);
-  }
-  return id;
-}
 
 // 큐는 메모리에 한 벌 두고, 모든 변경을 한 줄로 세워(chain) 동시에 쓰다 잃는 일이 없게 한다.
 let cache: QueueItem[] | null = null;
@@ -84,7 +56,8 @@ export const pushItems = (items: QueueItem[]): Promise<number> =>
     return { queue: r.queue, result: r.dropped };
   });
 
-export const removeItems = (items: QueueItem[]): Promise<void> => mutate((q) => ({ queue: removeSent(q, items), result: undefined }));
+export const removeItems = (items: QueueItem[]): Promise<void> =>
+  mutate((q) => ({ queue: removeSent(q, items), result: undefined }));
 
 // 동기화 부가 정보(초기 전체 동기화 여부, 마지막 성공 시각)도 작은 파일로.
 interface Meta {
@@ -119,10 +92,20 @@ export function writeMeta(patch: Partial<Meta>): void {
 }
 
 /** 설정 화면 "서버 동기화" 줄이 보는 상태 */
-export const useSyncStatus = create<{ pending: number; lastSyncAt: number | null }>(() => ({ pending: 0, lastSyncAt: null }));
+export const useSyncStatus = create<{ pending: number; lastSyncAt: number | null }>(() => ({
+  pending: 0,
+  lastSyncAt: null,
+}));
 
 /** 앱 시작 때 한 번: 파일에서 큐·메타를 읽어 상태에 반영한다. */
 export async function initSyncState(): Promise<void> {
   const q = await readQueue();
   useSyncStatus.setState({ pending: q.length, lastSyncAt: readMeta().lastSyncAt });
+}
+
+/** 계정이 바뀌거나 탈퇴해서 폰 기록을 지울 때: 대기 중인 백업과 "처음 전체 올림" 표시도 함께 비운다. */
+export function resetSyncState(): Promise<void> {
+  const p = mutate(() => ({ queue: [], result: undefined }));
+  writeMeta({ initialDone: false, lastSyncAt: null });
+  return p;
 }

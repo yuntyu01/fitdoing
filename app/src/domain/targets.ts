@@ -41,3 +41,13 @@ export function perMealTarget(t: Targets, mealCount: number): Targets {
     fat: Math.round(t.fat / n),
   };
 }
+
+/**
+ * 아직 안 찍은 끼니들의 목표: 하루 목표에서 오늘 먹은 만큼을 빼고 남은 끼니 수로 똑같이 나눈다.
+ * 다 먹었거나 넘쳤으면 0. 서버 /api/today 의 rows[].target 과 같은 계산.
+ */
+export function remainingPerMeal(t: Targets, eaten: Targets, remainingMeals: number): Targets {
+  const n = Math.max(1, remainingMeals);
+  const left = (k: keyof Targets) => Math.max(0, Math.round((t[k] - eaten[k]) / n));
+  return { kcal: left('kcal'), carbs: left('carbs'), protein: left('protein'), fat: left('fat') };
+}

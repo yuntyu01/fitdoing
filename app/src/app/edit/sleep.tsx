@@ -19,7 +19,7 @@ export default function EditSleep() {
       header={<SubHeader title={t('settings.sleep')} onBack={() => router.back()} />}
       footer={
         <FullButton
-          label={t('common.save')}
+          label={t('edit.save')}
           onPress={() => {
             update({ sleep });
             router.back();
@@ -27,7 +27,7 @@ export default function EditSleep() {
         />
       }
     >
-      <SleepEditor value={sleep} onChange={setSleep} />
+      <SleepEditor value={sleep} onChange={setSleep} title={t('edit.sleepEnabled')} />
     </Screen>
   );
 }

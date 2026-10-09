@@ -1,23 +1,70 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import type { Settings } from '../../db/schema';
 import { isEmptyMonth, monthOf, sameMonth, shiftMonth, type YearMonth } from '../../domain/calendar';
 import { buildDayDetail } from '../../domain/records';
 import { dateKey } from '../../domain/time';
-import { Calendar } from '../../features/records/Calendar';
+import { Calendar, CalendarLegend } from '../../features/records/Calendar';
 import { DayCard } from '../../features/records/DayCard';
+import { loggedMealsOf } from '../../features/records/format';
 import { useMonthRecords } from '../../features/records/useMonthRecords';
 import { useSettingsValue } from '../../features/settings/store';
 import { useNow } from '../../features/today/useToday';
-import { Card } from '../../ui/Card';
-import { colors, fonts, radius, space, tabular, type } from '../../ui/tokens';
+import { useWeeklyRows } from '../../features/weekly/useWeeklyRows';
+import { WeeklyCard } from '../../features/weekly/WeeklyCard';
+import { useTabBarSpace } from '../../ui/FloatingTabBar';
+import { useThemedStyles, type Palette } from '../../ui/theme';
+import { fonts, layout, text } from '../../ui/tokens';
+
+type Tab = 'calendar' | 'weekly';
 
 export default function RecordsScreen() {
+  const tabSpace = useTabBarSpace(); // 떠 있는 탭바에 마지막 내용이 가리지 않게
   const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const settings = useSettingsValue();
   const now = useNow();
+  const [tab, setTab] = useState<Tab>('calendar');
+
+  return (
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: tabSpace + layout.block }]}>
+        <Text style={styles.title}>{t('records.title')}</Text>
+
+        <View style={styles.tabs} accessibilityRole="tablist">
+          {(['calendar', 'weekly'] as const).map((k) => (
+            <Pressable
+              key={k}
+              onPress={() => setTab(k)}
+              style={styles.tab}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tab === k }}
+            >
+              <Text style={[styles.tabText, tab === k && styles.tabOn]}>
+                {k === 'calendar' ? t('records.tabCalendar') : t('records.tabWeekly')}
+              </Text>
+              <View style={[styles.underline, tab === k && styles.underlineOn]} />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* 달력 탭을 숨겨도 고른 달·날짜는 유지한다 */}
+        <View style={tab === 'calendar' ? null : styles.hidden}>
+          <CalendarTab settings={settings} now={now} />
+        </View>
+        {tab === 'weekly' ? <WeeklyTab settings={settings} now={now} /> : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function CalendarTab({ settings, now }: { settings: Settings; now: Date }) {
+  const { t } = useTranslation();
+  const styles = useThemedStyles(makeStyles);
   const today = dateKey(now);
   const [ym, setYm] = useState<YearMonth>(() => monthOf(new Date()));
   const [picked, setPicked] = useState<string | null>(null);
@@ -30,90 +77,71 @@ export default function RecordsScreen() {
     const f = selected ? rec.facts.get(selected) : null;
     return f ? buildDayDetail(f, rec.logs) : null;
   }, [selected, rec]);
+  const meals = useMemo(() => (selected ? loggedMealsOf(rec.logs, selected) : []), [selected, rec.logs]);
   const empty = isEmptyMonth(rec.list);
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.title}>{t('records.title')}</Text>
+    <View>
+      <Calendar
+        ym={ym}
+        weeks={rec.weeks}
+        facts={rec.facts}
+        today={today}
+        selected={selected}
+        onSelect={setPicked}
+        onShift={(d) => {
+          setYm((cur) => shiftMonth(cur, d));
+          setPicked(null);
+        }}
+        note={
+          empty
+            ? t('records.monthEmpty')
+            : t('records.monthStats', { full: rec.summary.full, locked: rec.summary.locked, gym: rec.summary.gym })
+        }
+      />
+      <CalendarLegend />
 
-        <View style={styles.summary}>
-          <Stat n={rec.summary.full} label={t('records.statFull')} />
-          <Stat n={rec.summary.locked} label={t('records.statLocked')} />
-          <Stat n={rec.summary.gym} label={t('records.statGym')} />
-        </View>
-
-        <Card style={styles.cal}>
-          <Calendar
-            ym={ym}
-            weeks={rec.weeks}
-            facts={rec.facts}
-            today={today}
-            selected={selected}
-            onSelect={setPicked}
-            onShift={(d) => {
-              setYm((cur) => shiftMonth(cur, d));
-              setPicked(null);
-            }}
-          />
-          <Legend />
-          {empty ? <Text style={styles.empty}>{t('records.monthEmpty')}</Text> : null}
-        </Card>
-
+      <View style={styles.day}>
         {detail ? (
-          <DayCard detail={detail} targets={settings.targets} />
+          <DayCard
+            detail={detail}
+            meals={meals}
+            isToday={detail.date === today}
+            onOpen={() => router.push({ pathname: '/day', params: { date: detail.date } })}
+          />
         ) : (
           <Text style={styles.hint}>{t('records.pickDay')}</Text>
         )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Stat({ n, label }: { n: number; label: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statN}>{n}</Text>
-      <Text style={styles.statLabel} numberOfLines={1}>
-        {label}
-      </Text>
+      </View>
     </View>
   );
 }
 
-function Legend() {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.legend}>
-      <Key swatch={<View style={[styles.sw, { backgroundColor: colors.accent }]} />} label={t('records.legendFull')} />
-      <Key swatch={<View style={[styles.sw, { backgroundColor: '#D5D9DE' }]} />} label={t('records.legendPartial')} />
-      <Key swatch={<View style={styles.swDot} />} label={t('records.legendLocked')} />
-    </View>
-  );
+/** 홈과 같은 주간 그래프 */
+function WeeklyTab({ settings, now }: { settings: Settings; now: Date }) {
+  const rows = useWeeklyRows(now);
+  return <WeeklyCard rows={rows} targets={settings.targets} now={now} />;
 }
 
-function Key({ swatch, label }: { swatch: React.ReactNode; label: string }) {
-  return (
-    <View style={styles.key}>
-      {swatch}
-      <Text style={type.caption}>{label}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  body: { paddingHorizontal: space.gutter, paddingBottom: 120, gap: space.gap },
-  title: { ...type.title, marginTop: space.l },
-  summary: { flexDirection: 'row', gap: space.s },
-  stat: { flex: 1, backgroundColor: colors.card, borderRadius: radius.tile, padding: space.m, gap: space.xs },
-  statN: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 26, color: colors.text, ...tabular },
-  statLabel: { ...type.caption },
-  cal: { paddingHorizontal: space.m },
-  legend: { flexDirection: 'row', justifyContent: 'center', gap: space.m, marginTop: space.m },
-  key: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sw: { width: 10, height: 10, borderRadius: 5 },
-  swDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.text },
-  empty: { ...type.desc, textAlign: 'center', marginTop: space.m },
-  hint: { ...type.desc, textAlign: 'center', marginTop: space.m },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    body: { paddingHorizontal: layout.page }, // 아래 여백은 떠 있는 탭바 높이로 화면에서 정한다
+    title: { ...text.title, color: c.text, marginTop: 20 },
+    tabs: {
+      flexDirection: 'row',
+      marginTop: layout.inner,
+      marginBottom: layout.block - 4,
+      borderBottomWidth: layout.hairline,
+      borderBottomColor: c.line,
+    },
+    tab: { flex: 1, alignItems: 'center', paddingTop: 10 },
+    tabText: { ...text.body, color: c.sub, paddingBottom: 10 },
+    tabOn: { fontFamily: fonts.semibold, color: c.text },
+    // 고른 탭 아래 얇은 밑줄 (아래 구분선 위에 겹친다)
+    underline: { alignSelf: 'stretch', height: 2, marginBottom: -layout.hairline },
+    underlineOn: { backgroundColor: c.text },
+    hidden: { display: 'none' },
+    day: { marginTop: layout.block + 4 },
+    hint: { ...text.body, color: c.sub, textAlign: 'center' },
+  });

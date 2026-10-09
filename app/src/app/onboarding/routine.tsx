@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from 'react-native';
 
+import { clampWeeklyTarget } from '../../domain/stats';
 import { useOnboardingDraft } from '../../features/onboarding/draft';
+import { FormNote } from '../../features/settings/editors/Form';
 import { GymEditor, SleepEditor } from '../../features/settings/editors/RoutineEditors';
 import { FullButton } from '../../ui/FullButton';
 import { StepHeader } from '../../ui/Headers';
 import { Screen } from '../../ui/Screen';
-import { type } from '../../ui/tokens';
 
 export default function RoutineStep() {
   const { t } = useTranslation();
@@ -20,19 +20,22 @@ export default function RoutineStep() {
 
   return (
     <Screen
-      header={<StepHeader title={t('app.name')} step={3} total={3} onBack={() => router.back()} />}
+      header={<StepHeader step={3} total={4} onBack={() => router.back()} />}
       title={t('onboarding.routineTitle')}
       footer={
         <FullButton
-          label={t('onboarding.routineStart')}
+          label={t('common.next')}
           disabled={!gymOk}
-          onPress={() => router.push('/onboarding/permissions')}
+          onPress={() => {
+            set({ gym: { ...gym, weeklyTarget: clampWeeklyTarget(gym.weeklyTarget, gym.days.length) } });
+            router.push('/onboarding/permissions');
+          }}
         />
       }
     >
       <GymEditor value={gym} onChange={(g) => set({ gym: g })} />
       <SleepEditor value={sleep} onChange={(s) => set({ sleep: s })} />
-      <Text style={[type.note, { textAlign: 'center' }]}>{t('onboarding.routineCaption')}</Text>
+      <FormNote>{t('onboarding.routineNote')}</FormNote>
     </Screen>
   );
 }

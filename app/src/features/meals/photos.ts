@@ -37,3 +37,12 @@ export function deleteStoredPhoto(uri: string | null | undefined): void {
     // 사진이 이미 없어도 상관없다.
   }
 }
+
+/** 서버에서 받은 백업 사진을 문서 디렉터리에 쓰고 mealLogs.photoUri에 둘 경로를 돌려준다(새 폰 복원). */
+export function saveDownloadedPhoto(bytes: Uint8Array, date: string, index: number, at: number): string {
+  const dir = mealsDir();
+  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+  const dest = new File(dir, photoFileName(date, index, at));
+  dest.write(bytes);
+  return dest.uri;
+}

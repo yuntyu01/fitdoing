@@ -6,6 +6,7 @@ import type { Goal, Targets } from '../domain/targets';
 // 날짜는 기기 로컬 기준 'YYYY-MM-DD', 시각은 epoch ms, 하루 중 시각은 'HH:mm'.
 
 export type Mode = 'mild' | 'normal' | 'spicy';
+export type ThemeMode = 'system' | 'light' | 'dark';
 export type { Goal };
 
 export interface Settings {
@@ -17,6 +18,7 @@ export interface Settings {
   gym: {
     enabled: boolean;
     days: number[]; // 0=월 ... 6=일
+    weeklyTarget: number; // 이번 주 몇 번 가면 달성인지 (1~7, 기본은 요일 수)
     arriveBy: string; // 도착 시간
     name: string;
     address: string;
@@ -31,6 +33,10 @@ export interface Settings {
   lockMinutes: number;
   emergencyPerWeek: number;
   photoBackup: boolean; // 켰을 때만 사진이 R2로 올라간다
+  nickname: string; // 친구에게 보이는 이름 (20자 이하)
+  themeMode: ThemeMode; // 화면 모드: 시스템 설정을 따르거나 밝게/어둡게 고정
+  notifications: boolean; // 마감 알림 켜기/끄기
+  shareFriends: boolean; // 새 끼니를 친구에게 공유하는 기본값
 }
 
 // 설정은 한 줄짜리 JSON으로 둔다. 잠금 엔진에는 setSchedule로 따로 넘긴다.
@@ -40,8 +46,20 @@ export const settings = sqliteTable('settings', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+/** 인식한 음식 하나. 칼로리·탄단지는 AI가 음식마다 추정한 값이고, 직접 입력한 음식은 없다(끼니 합계는 AiResult 쪽이 기준). */
+export interface FoodItem {
+  name: string;
+  amount: string;
+  kcal?: number | null;
+  carbs?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+  /** 이 음식을 먹은 비율 (0.25·0.5·0.75·1·1.5·2, 없으면 1). 위 숫자는 음식 전체 기준, 끼니 합계에는 이미 반영돼 있다. */
+  portion?: number | null;
+}
+
 export interface AiResult {
-  items: { name: string; amount: string }[];
+  items: FoodItem[];
   kcal: number;
   carbs: number;
   protein: number;
@@ -59,8 +77,9 @@ export const mealLogs = sqliteTable(
     photoUri: text('photo_uri'), // 기기 안 경로. 백업을 켜지 않으면 폰 밖으로 나가지 않는다.
     barcode: text('barcode'),
     ai: text('ai', { mode: 'json' }).$type<AiResult>(),
-    portion: real('portion').notNull().default(1), // 0.25, 0.5, 1
+    portion: real('portion').notNull().default(1), // 0.25, 0.5, 1, 1.5, 2
     sharedMeal: integer('shared_meal', { mode: 'boolean' }).notNull().default(false),
+    shareFriends: integer('share_friends', { mode: 'boolean' }).notNull().default(false), // 친구에게 공유
     loggedAt: integer('logged_at'),
     status: text('status', { enum: ['pending', 'logged', 'overdue', 'locked'] })
       .notNull()
@@ -88,6 +107,7 @@ export const lockEvents = sqliteTable('lock_events', {
   startedAt: integer('started_at').notNull(),
   endedAt: integer('ended_at'),
   releasedBy: text('released_by', { enum: ['action', 'time', 'emergency', 'coupon'] }),
+  reason: text('reason'), // 비상 해제 사유 (선택)
 });
 
 export const couponUses = sqliteTable('coupon_uses', {

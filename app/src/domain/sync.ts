@@ -27,6 +27,7 @@ export interface LockEventBody {
   startedAt: number;
   endedAt: number | null;
   releasedBy: ReleasedBy | null;
+  reason: string | null; // 비상 해제 사유
 }
 export interface CouponUseBody {
   type: CouponKind;
@@ -51,6 +52,7 @@ export function toSettingsBody(s: Settings): Settings {
     gym: {
       enabled: s.gym.enabled,
       days: [...s.gym.days],
+      weeklyTarget: s.gym.weeklyTarget,
       arriveBy: s.gym.arriveBy,
       name: s.gym.name,
       address: s.gym.address,
@@ -65,6 +67,10 @@ export function toSettingsBody(s: Settings): Settings {
     lockMinutes: s.lockMinutes,
     emergencyPerWeek: s.emergencyPerWeek,
     photoBackup: s.photoBackup,
+    nickname: s.nickname,
+    themeMode: s.themeMode,
+    notifications: s.notifications,
+    shareFriends: s.shareFriends,
   };
 }
 
@@ -74,7 +80,11 @@ export function localDateKey(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function toGymLogBody(r: { date: string; checkInAt: number | null; verifiedBy: VerifiedBy | null }): GymLogBody | null {
+export function toGymLogBody(r: {
+  date: string;
+  checkInAt: number | null;
+  verifiedBy: VerifiedBy | null;
+}): GymLogBody | null {
   if (!r.verifiedBy) return null; // 인증 전 기록은 보내지 않는다
   return { date: r.date, verifiedBy: r.verifiedBy, checkInAt: r.checkInAt ?? null };
 }
@@ -86,6 +96,7 @@ export function toLockEventBody(r: {
   startedAt: number;
   endedAt: number | null;
   releasedBy: ReleasedBy | null;
+  reason?: string | null;
 }): LockEventBody {
   return {
     type: r.type,
@@ -93,6 +104,7 @@ export function toLockEventBody(r: {
     startedAt: r.startedAt,
     endedAt: r.endedAt ?? null,
     releasedBy: r.releasedBy ?? null,
+    reason: r.reason ?? null,
   };
 }
 export function toCouponUseBody(r: { type: CouponKind; usedAt: number; weekKey: string }): CouponUseBody {
@@ -107,17 +119,38 @@ export type EventItem =
   | { kind: 'event'; key: string; table: 'lockEvents'; body: LockEventBody }
   | { kind: 'event'; key: string; table: 'couponUses'; body: CouponUseBody };
 
+/** 사진 백업 한 장. uri가 null이면 서버의 그 끼니 사진을 지운다(끼니를 사진 없이 다시 기록). */
+export interface PhotoBody {
+  date: string;
+  index: number;
+  uri: string | null;
+}
+
 export type QueueItem =
   | { kind: 'meal'; key: string; body: MealBackup }
   | { kind: 'settings'; key: 'settings'; body: unknown }
+  | { kind: 'photo'; key: string; body: PhotoBody }
+  | { kind: 'photoWipe'; key: 'photoWipe'; body: null } // 사진 백업을 껐다: 서버의 사진을 모두 지운다
   | EventItem;
 
 export const MAX_QUEUE = 500;
 export const MAX_EVENTS_PER_REQUEST = 200;
 
 export const mealQueueKey = (date: string, index: number) => `meal:${date}:${index}`;
-export const gymItem = (b: GymLogBody): EventItem => ({ kind: 'event', key: `gym:${b.date}`, table: 'gymLogs', body: b });
-export const sleepItem = (b: SleepLogBody): EventItem => ({ kind: 'event', key: `sleep:${b.date}`, table: 'sleepLogs', body: b });
+export const photoItem = (b: PhotoBody): QueueItem => ({ kind: 'photo', key: `photo:${b.date}:${b.index}`, body: b });
+export const PHOTO_WIPE: QueueItem = { kind: 'photoWipe', key: 'photoWipe', body: null };
+export const gymItem = (b: GymLogBody): EventItem => ({
+  kind: 'event',
+  key: `gym:${b.date}`,
+  table: 'gymLogs',
+  body: b,
+});
+export const sleepItem = (b: SleepLogBody): EventItem => ({
+  kind: 'event',
+  key: `sleep:${b.date}`,
+  table: 'sleepLogs',
+  body: b,
+});
 export const lockItem = (b: LockEventBody): EventItem => ({
   kind: 'event',
   key: `lock:${b.type}:${b.startedAt}`,
@@ -141,7 +174,11 @@ export function enqueue(queue: QueueItem[], item: QueueItem, max = MAX_QUEUE): {
   return { queue: dropped > 0 ? next.slice(dropped) : next, dropped };
 }
 
-export function enqueueAll(queue: QueueItem[], items: QueueItem[], max = MAX_QUEUE): { queue: QueueItem[]; dropped: number } {
+export function enqueueAll(
+  queue: QueueItem[],
+  items: QueueItem[],
+  max = MAX_QUEUE,
+): { queue: QueueItem[]; dropped: number } {
   let q = queue;
   let dropped = 0;
   for (const it of items) {
@@ -155,10 +192,12 @@ export function enqueueAll(queue: QueueItem[], items: QueueItem[], max = MAX_QUE
 // ---- 요청 계획 ----
 
 export interface SyncRequest {
-  method: 'POST' | 'PUT';
+  method: 'POST' | 'PUT' | 'DELETE';
   path: string;
   body: unknown;
   items: QueueItem[];
+  /** 있으면 JSON 대신 이 파일을 multipart "photo"로 보낸다 */
+  upload?: { uri: string };
 }
 
 export function eventsBody(items: EventItem[]): SyncEventsBody {
@@ -172,7 +211,10 @@ export function eventsBody(items: EventItem[]): SyncEventsBody {
   return out;
 }
 
-/** 설정 → 끼니 → (헬스·취침·잠금·쿠폰을 묶은) events 순으로 보낼 요청 목록. */
+/**
+ * 설정 → 끼니 → 사진 → (헬스·취침·잠금·쿠폰을 묶은) events 순으로 보낼 요청 목록.
+ * 사진 백업을 껐다면(photoWipe) 그보다 먼저 쌓인 사진 올리기는 보내지 않고 "모두 지우기"와 함께 치운다.
+ */
 export function planRequests(queue: QueueItem[], maxEvents = MAX_EVENTS_PER_REQUEST): SyncRequest[] {
   const reqs: SyncRequest[] = [];
   for (const it of queue) {
@@ -181,6 +223,20 @@ export function planRequests(queue: QueueItem[], maxEvents = MAX_EVENTS_PER_REQU
   for (const it of queue) {
     if (it.kind === 'meal') reqs.push({ method: 'POST', path: '/api/meals', body: it.body, items: [it] });
   }
+  const wipeAt = queue.findIndex((q) => q.kind === 'photoWipe');
+  if (wipeAt >= 0) {
+    const stale = queue.slice(0, wipeAt).filter((q) => q.kind === 'photo');
+    reqs.push({ method: 'DELETE', path: '/api/meals/photos', body: null, items: [queue[wipeAt], ...stale] });
+  }
+  queue.forEach((it, i) => {
+    if (it.kind !== 'photo' || i < wipeAt) return;
+    const path = `/api/meals/photo?date=${it.body.date}&index=${it.body.index}`;
+    reqs.push(
+      it.body.uri
+        ? { method: 'PUT', path, body: null, items: [it], upload: { uri: it.body.uri } }
+        : { method: 'DELETE', path, body: null, items: [it] },
+    );
+  });
   const events = queue.filter((q): q is EventItem => q.kind === 'event');
   for (let i = 0; i < events.length; i += maxEvents) {
     const chunk = events.slice(i, i + maxEvents);
@@ -191,12 +247,16 @@ export function planRequests(queue: QueueItem[], maxEvents = MAX_EVENTS_PER_REQU
 
 // ---- 보내기 루프 ----
 
-export type Outcome = 'ok' | 'drop' | 'retry';
+export type Outcome = 'ok' | 'drop' | 'retry' | 'unauth';
 
-/** HTTP 상태(없으면 네트워크 오류)를 큐 처리 결과로. 4xx는 다시 보내도 같아서 버리고, 나머지는 유지한다. */
+/**
+ * HTTP 상태(없으면 네트워크 오류)를 큐 처리 결과로. 4xx는 다시 보내도 같아서 버리고, 나머지는 유지한다.
+ * 401(로그인 토큰 없음·만료)은 요청 내용 탓이 아니므로 버리지 않고 멈춘다 — 다시 로그인하면 이어서 보낸다.
+ */
 export function classify(status: number | null): Outcome {
   if (status === null) return 'retry';
   if (status >= 200 && status < 300) return 'ok';
+  if (status === 401) return 'unauth';
   if (status >= 400 && status < 500) return 'drop';
   return 'retry';
 }
@@ -221,6 +281,7 @@ export interface FlushResult {
   sent: number; // 서버가 받은 항목 수
   dropped: number; // 4xx로 버린 항목 수
   failed: boolean; // 네트워크·5xx로 멈췄다(큐에 남음)
+  unauthorized: boolean; // 401로 멈췄다(큐에 남음). 다시 로그인하기 전에는 재시도하지 않는다
 }
 
 async function sendOne(io: FlushIO, req: SyncRequest, res: FlushResult): Promise<boolean> {
@@ -245,18 +306,22 @@ async function sendOne(io: FlushIO, req: SyncRequest, res: FlushResult): Promise
       }
       return true;
     }
-    io.warn?.(`sync rejected (${status}) ${req.path}`, req.items.map((i) => i.key));
+    io.warn?.(
+      `sync rejected (${status}) ${req.path}`,
+      req.items.map((i) => i.key),
+    );
     await io.remove(req.items);
     res.dropped += req.items.length;
     return true;
   }
-  res.failed = true;
+  if (o === 'unauth') res.unauthorized = true;
+  else res.failed = true;
   return false;
 }
 
 /** 큐를 계획대로 모두 보낸다. 서버·네트워크 문제가 나면 거기서 멈춘다. */
 export async function drainQueue(io: FlushIO): Promise<FlushResult> {
-  const res: FlushResult = { sent: 0, dropped: 0, failed: false };
+  const res: FlushResult = { sent: 0, dropped: 0, failed: false, unauthorized: false };
   for (const req of planRequests(await io.read())) {
     if (!(await sendOne(io, req, res))) break;
   }
@@ -282,23 +347,36 @@ export interface LocalRows {
     sharedMeal: boolean;
     loggedAt: number | null;
     status: string;
+    photoUri?: string | null;
+    shareFriends?: boolean;
   }[];
   gymLogs: { date: string; checkInAt: number | null; verifiedBy: VerifiedBy | null }[];
   sleepLogs: { date: string; lockedAt: number | null; unlockedAt: number | null }[];
-  lockEvents: { type: LockKind; startedAt: number; endedAt: number | null; releasedBy: ReleasedBy | null }[];
+  lockEvents: {
+    type: LockKind;
+    startedAt: number;
+    endedAt: number | null;
+    releasedBy: ReleasedBy | null;
+    reason?: string | null;
+  }[];
   couponUses: { type: CouponKind; usedAt: number; weekKey: string }[];
 }
 
 /** 로컬에 이미 있는 기록 전체를 큐 항목으로. 기록된(logged) 끼니와 인증된 헬스만 올린다. */
-export function initialSyncItems(
-  rows: LocalRows,
-  toMeal: (m: LocalRows['meals'][number]) => MealBackup,
-): QueueItem[] {
+export function initialSyncItems(rows: LocalRows, toMeal: (m: LocalRows['meals'][number]) => MealBackup): QueueItem[] {
   const items: QueueItem[] = [];
   if (rows.settings) items.push({ kind: 'settings', key: 'settings', body: toSettingsBody(rows.settings) });
   for (const m of rows.meals) {
     if (m.status !== 'logged' || !m.ai || m.loggedAt == null) continue;
     items.push({ kind: 'meal', key: mealQueueKey(m.date, m.index), body: toMeal(m) });
+  }
+  // 사진은 사진 백업을 켠 사람만 (끼니보다 뒤에 보낸다)
+  // 사진 백업을 켰거나 친구에게 공유한 끼니만 (공유한 끼니 사진은 친구가 볼 수 있게 서버에 있어야 한다)
+  const backup = rows.settings?.photoBackup === true;
+  for (const m of rows.meals) {
+    if (m.status === 'logged' && m.photoUri && (backup || m.shareFriends)) {
+      items.push(photoItem({ date: m.date, index: m.index, uri: m.photoUri }));
+    }
   }
   for (const g of rows.gymLogs) {
     const b = toGymLogBody(g);

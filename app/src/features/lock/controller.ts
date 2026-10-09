@@ -3,6 +3,7 @@ import { usePathname, useRootNavigationState, useRouter, type Href } from 'expo-
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { useSession } from '../auth/session';
 import { useSettings } from '../settings/store';
 import { onMealLogged } from '../meals/hooks';
 import { releaseGymLock, releaseMealLock } from './actions';
@@ -25,6 +26,7 @@ export function useLockController() {
   const navReady = !!useRootNavigationState()?.key;
   const settings = useSettings((s) => s.settings);
   const active = useLock((s) => s.active);
+  const loggedIn = useSession((s) => s.status === 'in');
   const hasSettings = settings !== null;
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export function useLockController() {
   }, [hasSettings]);
 
   useEffect(() => {
-    if (!navReady || !hasSettings) return;
+    if (!navReady || !hasSettings || !loggedIn) return; // 로그아웃 상태에서는 잠금 화면 경로가 막혀 있다
     const onLock = pathname.startsWith('/lock');
     if (active) {
       const target = `/lock/${active.type}`;
@@ -80,5 +82,5 @@ export function useLockController() {
       if (router.canGoBack()) router.back();
       else router.replace('/');
     }
-  }, [active, pathname, navReady, hasSettings, router]);
+  }, [active, pathname, navReady, hasSettings, loggedIn, router]);
 }

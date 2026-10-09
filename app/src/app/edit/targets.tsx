@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { formatNumber } from '../../domain/format';
 import { defaultTargets, macrosFor, MIN_KCAL } from '../../domain/targets';
+import { FormSection, Rows } from '../../features/settings/editors/Form';
 import { useSettings, useSettingsValue } from '../../features/settings/store';
-import { Card, Divider } from '../../ui/Card';
 import { FullButton } from '../../ui/FullButton';
 import { SubHeader } from '../../ui/Headers';
+import { ListRow } from '../../ui/ListRow';
 import { NumberField } from '../../ui/NumberField';
 import { Screen } from '../../ui/Screen';
-import { colors, fonts, space, type } from '../../ui/tokens';
 
 export default function EditTargets() {
   const { t } = useTranslation();
@@ -36,44 +36,35 @@ export default function EditTargets() {
       header={<SubHeader title={t('settings.targets')} onBack={() => router.back()} />}
       desc={t('settings.targetsDesc')}
       footer={
-        <View style={{ gap: space.s }}>
-          <FullButton label={t('settings.resetTargets')} variant="secondary" onPress={reset} />
-          <FullButton
-            label={t('common.save')}
-            disabled={tooLow || p <= 0}
-            onPress={() => {
-              update({ targets: preview });
-              router.back();
-            }}
-          />
-        </View>
+        <FullButton
+          label={t('edit.save')}
+          disabled={tooLow || p <= 0}
+          onPress={() => {
+            update({ targets: preview });
+            router.back();
+          }}
+        />
       }
     >
-      <Card style={{ gap: space.m }}>
-        <NumberField
-          label={t('settings.kcal')}
-          unit={t('common.kcal')}
-          value={kcal}
-          onChange={setKcal}
-          error={tooLow ? t('settings.minKcal', { min: formatNumber(MIN_KCAL) }) : undefined}
-        />
-        <Divider />
-        <NumberField label={t('settings.protein')} unit={t('common.gram')} value={protein} onChange={setProtein} />
-        <Divider />
-        <View style={styles.auto}>
-          <Text style={type.desc}>{t('settings.carbsAuto')}</Text>
-          <Text style={styles.autoVal}>{preview.carbs}g</Text>
+      <FormSection title={t('edit.targetsDaily')}>
+        <View style={{ gap: 16 }}>
+          <NumberField
+            label={t('settings.kcal')}
+            unit={t('common.kcal')}
+            value={kcal}
+            onChange={setKcal}
+            error={tooLow ? t('settings.minKcal', { min: formatNumber(MIN_KCAL) }) : undefined}
+          />
+          <NumberField label={t('settings.protein')} unit={t('common.gram')} value={protein} onChange={setProtein} />
         </View>
-        <View style={styles.auto}>
-          <Text style={type.desc}>{t('settings.fatAuto')}</Text>
-          <Text style={styles.autoVal}>{preview.fat}g</Text>
-        </View>
-      </Card>
+      </FormSection>
+      <FormSection title={t('edit.targetsAuto')}>
+        <Rows>
+          <ListRow label={t('edit.carbs')} value={`${preview.carbs}${t('common.gram')}`} />
+          <ListRow label={t('edit.fat')} value={`${preview.fat}${t('common.gram')}`} />
+        </Rows>
+      </FormSection>
+      <FullButton label={t('settings.resetTargets')} variant="text" onPress={reset} />
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  auto: { flexDirection: 'row', justifyContent: 'space-between' },
-  autoVal: { fontFamily: fonts.medium, fontSize: 17, color: colors.text, fontVariant: ['tabular-nums'] },
-});

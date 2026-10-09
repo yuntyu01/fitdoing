@@ -57,6 +57,11 @@ function contentFor(n: PlannedNotification) {
 
 /** 예약된 알림을 모두 지우고 앞으로 7일치를 다시 건다. 찍은 끼니는 빠진다. */
 export async function rescheduleNotifications(settings: Settings, now = new Date()) {
+  // 설정에서 마감 알림을 끄면 예약된 알림을 모두 지우고 새로 잡지 않는다
+  if (settings.notifications === false) {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    return;
+  }
   const from = dateKey(scheduleDay(settings.meals, now));
   const logged = db
     .select({ date: mealLogs.date, index: mealLogs.index })

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { clampWeeklyTarget } from '../../domain/stats';
 import { GymEditor } from '../../features/settings/editors/RoutineEditors';
 import { useSettings, useSettingsValue } from '../../features/settings/store';
 import { FullButton } from '../../ui/FullButton';
@@ -20,16 +21,16 @@ export default function EditGym() {
       header={<SubHeader title={t('settings.gym')} onBack={() => router.back()} />}
       footer={
         <FullButton
-          label={t('common.save')}
+          label={t('edit.save')}
           disabled={!ok}
           onPress={() => {
-            update({ gym });
+            update({ gym: { ...gym, weeklyTarget: clampWeeklyTarget(gym.weeklyTarget, gym.days.length) } });
             router.back();
           }}
         />
       }
     >
-      <GymEditor value={gym} onChange={setGym} />
+      <GymEditor value={gym} onChange={setGym} title={t('edit.gymEnabled')} />
     </Screen>
   );
 }

@@ -1,4 +1,4 @@
-import { weeklySeries, type WeeklyRow } from './weekly';
+import { weeklySeries, weeklySummary, type WeeklyRow } from './weekly';
 
 const row = (date: string, kcal: number, portion = 1): WeeklyRow => ({
   date,
@@ -60,5 +60,28 @@ describe('weeklySeries', () => {
 
   it('지표를 바꿀 수 있다', () => {
     expect(weeklySeries(rows, 'protein', 100, NOW).days[3].current).toBe(90);
+  });
+});
+
+describe('weeklySummary', () => {
+  // 목표 1600 → 범위 1440~1760. 수 1500(안), 목 1800(+200), 금 1200(-400), 토는 오늘이라 빠진다.
+  const rows = [row('2026-09-23', 1500), row('2026-09-24', 1800), row('2026-09-25', 1200), row('2026-09-26', 3000)];
+  const sum = weeklySummary(weeklySeries(rows, 'kcal', 1600, NOW));
+
+  it('완료한 날과 범위 안에 든 날을 센다 (오늘 제외)', () => {
+    expect(sum.completed).toBe(3);
+    expect(sum.achieved).toBe(1);
+  });
+
+  it('범위 밖에서 목표와 가장 많이 차이 난 날을 고른다', () => {
+    expect(sum.furthest).toEqual({ index: 4, diff: -400 });
+  });
+
+  it('모두 범위 안이면 furthest 는 null', () => {
+    expect(weeklySummary(weeklySeries([row('2026-09-23', 1600)], 'kcal', 1600, NOW)).furthest).toBeNull();
+  });
+
+  it('완료한 날이 없으면 0', () => {
+    expect(weeklySummary(weeklySeries([], 'kcal', 1600, NOW))).toEqual({ completed: 0, achieved: 0, furthest: null });
   });
 });

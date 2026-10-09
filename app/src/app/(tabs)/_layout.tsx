@@ -1,27 +1,20 @@
 import { Tabs } from 'expo-router';
-import { House, Settings, SquareMenu } from 'lucide-react-native';
+import { ChartNoAxesColumn, House, Settings, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
-import { colors, fonts, radius } from '../../ui/tokens';
+import { usePalette } from '../../ui/theme';
+import { FloatingTabBar } from '../../ui/FloatingTabBar';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
+  const c = usePalette();
 
   return (
     <Tabs
+      tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        sceneStyle: { backgroundColor: colors.bg },
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.sub,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
-        // 시안: 선 없이 윗모서리만 둥근 흰 막대
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopWidth: 0,
-          borderTopLeftRadius: radius.card,
-          borderTopRightRadius: radius.card,
-        },
+        sceneStyle: { backgroundColor: c.bg },
       }}
     >
       <Tabs.Screen
@@ -37,8 +30,15 @@ export default function TabsLayout() {
         name="records"
         options={{
           title: t('tabs.records'),
-          tabBarIcon: ({ color, size }) => (
-            <SquareMenu color={color} size={size} strokeWidth={1.8} />
+          tabBarIcon: ({ color, size }) => <ChartNoAxesColumn color={color} size={size} strokeWidth={2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="friends"
+        options={{
+          title: t('tabs.friends'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Users color={color} size={size} strokeWidth={1.8} fill={focused ? color : 'none'} />
           ),
         }}
       />

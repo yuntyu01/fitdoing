@@ -75,3 +75,29 @@ export function weeklySeries(rows: WeeklyRow[], metric: WeeklyMetric, target: nu
     max: Math.max(target * 1.2, ...values, 1),
   };
 }
+
+export interface WeeklySummary {
+  /** 기록을 마친 지난 날 (오늘 제외) */
+  completed: number;
+  /** 그중 목표 범위(±10%) 안에 든 날 */
+  achieved: number;
+  /** 목표 범위 밖에서 목표와 가장 많이 차이 난 지난 날. diff = 값 - 목표 (음수면 모자람) */
+  furthest: { index: number; diff: number } | null;
+}
+
+/** 홈 주간 그래프 아래 한 줄 요약과 피드백 */
+export function weeklySummary(s: WeeklySeries): WeeklySummary {
+  const done = s.days.filter((d) => d.state === 'done' && d.current !== null);
+  let furthest: WeeklySummary['furthest'] = null;
+  let achieved = 0;
+  for (const d of done) {
+    const v = d.current as number;
+    if (v >= s.band.lo && v <= s.band.hi) {
+      achieved++;
+      continue;
+    }
+    const diff = v - s.target;
+    if (!furthest || Math.abs(diff) > Math.abs(furthest.diff)) furthest = { index: d.index, diff };
+  }
+  return { completed: done.length, achieved, furthest };
+}

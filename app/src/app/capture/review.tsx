@@ -1,56 +1,113 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Plus } from 'lucide-react-native';
+import { ChevronDown, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { AiResult } from '../../db/schema';
 import { formatNumber, roundGram, roundKcal } from '../../domain/format';
-import { applyPortion, cleanBarcode, EMPTY_AI, PORTIONS, pickMealIndex, type Portion } from '../../domain/logging';
+import {
+  applyPortion,
+  cleanBarcode,
+  EMPTY_AI,
+  ITEM_PORTIONS,
+  pickMealIndex,
+  PORTIONS,
+  type ItemPortion,
+  type Portion,
+} from '../../domain/logging';
+import {
+  canPortionPerFood,
+  eatenFoodInMeal,
+  foodFactor,
+  itemPortion,
+  mealToSave,
+  usesFoodPortions,
+} from '../../domain/portion';
+import { fromMinutes, parseDateKey } from '../../domain/time';
 import { analyzeMeal } from '../../features/api/client';
 import { ItemSheet, type FoodItem } from '../../features/meals/components/ItemSheet';
 import { MealChips } from '../../features/meals/components/MealChips';
 import { NutritionSheet } from '../../features/meals/components/NutritionSheet';
+import { PortionSheet } from '../../features/meals/components/PortionSheet';
 import { deleteStoredPhoto, shrinkPhoto, storePhoto } from '../../features/meals/photos';
-import { logMeal } from '../../features/meals/save';
+import { logMeal, readLoggedMeal } from '../../features/meals/save';
 import { useSettingsValue } from '../../features/settings/store';
 import { useNow, useToday } from '../../features/today/useToday';
 import { Card, Divider } from '../../ui/Card';
 import { FullButton } from '../../ui/FullButton';
+import { CenterHeader } from '../../ui/Headers';
 import { ListRow } from '../../ui/ListRow';
 import { Screen } from '../../ui/Screen';
-import { Segmented } from '../../ui/Segmented';
+import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
 import { Toggle } from '../../ui/Toggle';
-import { colors, fonts, radius, space, type } from '../../ui/tokens';
+import { fonts, layout, radius, text } from '../../ui/tokens';
 
-type Phase = 'analyzing' | 'done' | 'failed' | 'manual';
+// saved = 하루 상세에서 "수정"으로 연 저장된 끼니 (다시 분석하지 않는다)
+type Phase = 'analyzing' | 'done' | 'failed' | 'manual' | 'saved';
 
-/** 촬영 직후: 인식 결과를 고치고, 먹은 양을 고르고, 기록한다. */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const hhmm = (d: Date) => fromMinutes(d.getHours() * 60 + d.getMinutes());
+
+/**
+ * 촬영 직후: 인식 결과를 고치고, 음식별(또는 끼니 전체) 먹은 양을 고르고, 기록한다.
+ * /capture/review?date=&index=&edit=1 이면 저장된 끼니를 불러와 고친다(같은 날·같은 끼니를 덮어쓴다).
+ */
 export default function ReviewScreen() {
   const { t } = useTranslation();
-  const params = useLocalSearchParams<{ photoUri?: string; w?: string; h?: string; barcode?: string; meal?: string }>();
+  const c = usePalette();
+  const styles = useThemedStyles(makeStyles);
+  const params = useLocalSearchParams<{
+    photoUri?: string;
+    w?: string;
+    h?: string;
+    barcode?: string;
+    meal?: string;
+    date?: string;
+    index?: string;
+    edit?: string;
+  }>();
   const settings = useSettingsValue();
   const now = useNow();
   const today = useToday(settings, now);
 
-  const photoUri = params.photoUri || null;
-  const barcode = cleanBarcode(params.barcode);
+  // 수정: 화면을 연 순간의 저장값으로 시작한다 (그 뒤 DB가 바뀌어도 고치던 내용을 덮지 않는다)
+  const editMode = params.edit === '1';
+  const [saved] = useState(() =>
+    editMode && params.date && DATE_RE.test(params.date) && Number(params.index) > 0
+      ? readLoggedMeal(params.date, Number(params.index))
+      : null,
+  );
+  const missing = editMode && !saved;
 
-  const [phase, setPhase] = useState<Phase>(photoUri ? 'analyzing' : 'manual');
+  const photoUri = saved ? saved.photoUri : params.photoUri || null;
+  const barcode = saved ? saved.barcode : cleanBarcode(params.barcode);
+
+  // 헤더 아래 "오늘 18:40": 찍은(이 화면을 연) 시각. 수정이면 그 끼니를 기록한 날·시각.
+  const [openedAt] = useState(() => new Date(saved?.loggedAt ?? Date.now()));
+  const [phase, setPhase] = useState<Phase>(saved ? 'saved' : photoUri ? 'analyzing' : 'manual');
   const [attempt, setAttempt] = useState(0);
   const [shrunk, setShrunk] = useState<string | null>(null);
-  const [ai, setAi] = useState<AiResult>(EMPTY_AI);
-  const [portion, setPortion] = useState<Portion>(1);
-  const [shared, setShared] = useState(false);
+  const [ai, setAi] = useState<AiResult>(saved?.ai ?? EMPTY_AI);
+  const [portion, setPortion] = useState<Portion>((saved?.portion ?? 1) as Portion);
+  const [shared, setShared] = useState(saved?.sharedMeal ?? false);
+  const [shareFriends, setShareFriends] = useState(saved ? saved.shareFriends : settings.shareFriends);
+  // 합계를 직접 고쳤다(또는 예전 방식으로 저장된 끼니): 음식별 먹은 양 대신 이 합계 × 끼니 전체 먹은 양으로 기록한다.
+  const [manualTotals, setManualTotals] = useState(() =>
+    saved ? !usesFoodPortions(saved.ai ?? EMPTY_AI, saved.portion) : false,
+  );
   const [mealIndex, setMealIndex] = useState<number | null>(params.meal ? Number(params.meal) : null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [editing, setEditing] = useState<{ at: number | null } | null>(null);
   const [nutritionOpen, setNutritionOpen] = useState(false);
+  const [portionOpen, setPortionOpen] = useState(false);
+  const [foodAt, setFoodAt] = useState(0);
+  const [foodOpen, setFoodOpen] = useState(false);
 
-  // 사진 → 긴 변 1024px로 줄이기 → 서버 분석. 서버가 죽어도 직접 입력으로 이어진다.
+  // 사진 → 긴 변 1024px로 줄이기 → 서버 분석. 서버가 죽어도 직접 입력으로 이어진다. 수정에서는 분석하지 않는다.
   useEffect(() => {
-    if (!photoUri) return;
+    if (!photoUri || editMode) return;
     let cancelled = false;
     (async () => {
       try {
@@ -60,6 +117,7 @@ export default function ReviewScreen() {
         const result = await analyzeMeal(small);
         if (cancelled) return;
         setAi(result);
+        setManualTotals(false);
         setPhase('done');
       } catch (e) {
         console.warn('analyze failed', e);
@@ -74,17 +132,25 @@ export default function ReviewScreen() {
   }, [photoUri, params.w, params.h, attempt]);
 
   const meals = today.meals;
-  const chosen = mealIndex ?? pickMealIndex(meals);
-  const slot = meals.find((m) => m.index === chosen) ?? null;
+  const chosen = saved ? saved.index : (mealIndex ?? pickMealIndex(meals));
+  const slot = saved ? null : (meals.find((m) => m.index === chosen) ?? null);
   const already = !!slot?.log;
-  const nutrition = useMemo(() => applyPortion(ai, portion, shared), [ai, portion, shared]);
+
+  // 저장할 모양: 모든 음식에 숫자가 있으면 음식별 먹은 양의 합(끼니 먹은 양 1), 아니면 끼니 전체 먹은 양.
+  const plan = useMemo(() => mealToSave(ai, portion, manualTotals), [ai, portion, manualTotals]);
+  const perFood = plan.perFood;
+  const nutrition = useMemo(() => applyPortion(plan.ai, plan.portion, shared), [plan, shared]);
 
   const setItem = useCallback(
     (item: FoodItem) => {
       setAi((p) => {
         const items = [...p.items];
         if (editing?.at == null) items.push(item);
-        else items[editing.at] = item;
+        else {
+          // 이름이 같으면(양만 고침) AI가 추정한 음식별 칼로리·탄단지·먹은 양을 남기고, 다른 음식으로 바꾸면 버린다
+          const prev = items[editing.at];
+          items[editing.at] = prev && prev.name === item.name ? { ...prev, ...item } : item;
+        }
         return { ...p, items };
       });
       setEditing(null);
@@ -98,155 +164,298 @@ export default function ReviewScreen() {
     setEditing(null);
   };
 
+  const setFoodPortion = (at: number, p: ItemPortion) => {
+    setAi((prev) => ({ ...prev, items: prev.items.map((it, i) => (i === at ? { ...it, portion: p } : it)) }));
+    setFoodOpen(false);
+  };
+
+  const close = () => (saved ? router.back() : router.dismissAll());
+
   const leave = () => {
-    if (!photoUri && !barcode) return router.back();
-    Alert.alert(t('review.leaveTitle'), t('review.leaveBody'), [
+    if (missing || (!saved && !photoUri && !barcode)) return router.back();
+    Alert.alert(t(saved ? 'review.leaveEditTitle' : 'review.leaveTitle'), t('review.leaveBody'), [
       { text: t('review.keep'), style: 'cancel' },
-      { text: t('review.leave'), style: 'destructive', onPress: () => router.dismissAll() },
+      { text: t('review.leave'), style: 'destructive', onPress: close },
     ]);
   };
 
   const save = async () => {
-    if (!slot || saving) return;
+    const target = saved
+      ? { date: saved.date, index: saved.index, deadline: saved.deadline }
+      : slot
+        ? {
+            date: slot.date,
+            index: slot.index,
+            deadline: settings.meals.find((m) => m.index === slot.index)?.deadline ?? '00:00',
+          }
+        : null;
+    if (!target || saving) return;
     setSaving(true);
     setSaveError(false);
     const at = Date.now();
     let stored: string | null = null;
     try {
-      // 사진은 폰 안(앱 문서 디렉터리)에만 저장한다.
-      if (shrunk) stored = storePhoto(shrunk, slot.date, slot.index, at);
+      // 사진은 폰 안(앱 문서 디렉터리)에 저장한다. 수정은 원래 사진을 그대로 둔다(같은 경로라 지워지지 않는다).
+      if (saved) stored = saved.photoUri;
+      else if (shrunk) stored = storePhoto(shrunk, target.date, target.index, at);
       await logMeal(
         {
-          date: slot.date,
-          index: slot.index,
-          deadline: settings.meals.find((m) => m.index === slot.index)?.deadline ?? '00:00',
+          ...target,
           photoUri: stored,
           barcode,
-          ai,
-          portion,
+          ai: plan.ai,
+          portion: plan.portion,
           sharedMeal: shared,
+          shareFriends,
+          loggedAt: saved ? (saved.loggedAt ?? at) : undefined,
         },
         settings,
       );
-      router.dismissAll();
+      close();
     } catch (e) {
       console.warn('log meal failed', e);
-      deleteStoredPhoto(stored);
+      if (!saved) deleteStoredPhoto(stored);
       setSaveError(true);
       setSaving(false);
     }
   };
 
-  const portionLabels: Record<Portion, string> = { 0.25: t('review.portionQuarter'), 0.5: t('review.portionHalf'), 1: t('review.portionAll') };
+  const analyzing = phase === 'analyzing';
   const lowConfidence = phase === 'done' && ai.items.length > 0 && ai.confidence < 0.5;
+  const pct = Math.round(portion * 100);
+  const count = ai.items.length;
+  const savedDay = saved ? parseDateKey(saved.date) : null;
+  const food = ai.items[foodAt];
+  const photoNote = shareFriends
+    ? settings.photoBackup
+      ? 'review.photoNoteBackupShared'
+      : 'review.photoNoteShared'
+    : settings.photoBackup
+      ? 'review.photoNoteBackup'
+      : 'review.photoNote';
+
+  if (missing) {
+    return (
+      <Screen header={<CenterHeader title={t('review.editTitle')} onBack={() => router.back()} />}>
+        <Text style={styles.bodySub}>{t('review.notFound')}</Text>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
       header={
-        <Pressable onPress={leave} hitSlop={12} accessibilityRole="button" style={styles.back}>
-          <ChevronLeft size={24} color={colors.text} strokeWidth={1.8} />
-          <Text style={styles.backTitle}>{t('review.title')}</Text>
-        </Pressable>
+        <View>
+          <CenterHeader
+            title={t(saved ? 'review.editTitle' : 'review.title')}
+            onBack={leave}
+            right={chosen ? <Text style={styles.headerRight}>{t('common.meal', { n: chosen })}</Text> : null}
+          />
+          <Text style={styles.when}>
+            {savedDay
+              ? t('review.whenDate', { month: savedDay.getMonth() + 1, day: savedDay.getDate(), time: hhmm(openedAt) })
+              : t('review.when', { time: hhmm(openedAt) })}
+          </Text>
+        </View>
       }
       footer={
-        <View style={styles.footer}>
+        <>
           {saveError ? <Text style={styles.error}>{t('review.saveFailed')}</Text> : null}
-          <FullButton label={t('review.save')} onPress={save} disabled={saving || !slot || phase === 'analyzing'} />
-        </View>
+          <FullButton label={t('review.save')} onPress={save} disabled={saving || (!slot && !saved) || analyzing} />
+        </>
       }
     >
-      {photoUri ? (
-        <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
-      ) : barcode ? (
-        <Card>
-          <Text style={type.desc}>{t('review.barcodeLabel', { code: barcode })}</Text>
-          <Text style={[type.desc, { marginTop: space.xs }]}>{t('review.barcodeNote')}</Text>
-        </Card>
+      {photoUri || barcode ? (
+        <View style={styles.top}>
+          {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" /> : null}
+          {barcode ? (
+            <View style={styles.related}>
+              <Text style={styles.bodyText}>{t('review.barcodeLabel', { code: barcode })}</Text>
+              <Text style={styles.caption}>{t('review.barcodeNote')}</Text>
+            </View>
+          ) : null}
+        </View>
       ) : null}
 
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>{phase === 'failed' ? t('review.failedTitle') : t('review.detected')}</Text>
-        {phase === 'analyzing' ? (
-          <View style={styles.analyzing}>
-            <ActivityIndicator color={colors.text} />
-            <Text style={type.desc}>{t('review.analyzing')}</Text>
+      <View style={styles.related}>
+        <Card style={styles.summary}>
+          <Text style={styles.caption}>{t('review.estimate')}</Text>
+          {analyzing ? (
+            <View style={styles.analyzing}>
+              <ActivityIndicator color={c.sub} />
+              <Text style={styles.bodySub}>{t('review.analyzing')}</Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.kcalLine}>
+                <Text style={styles.kcal}>{formatNumber(roundKcal(nutrition.kcal))}</Text>
+                <Text style={styles.kcalUnit}> {t('common.kcal')}</Text>
+              </Text>
+              <View style={styles.macros}>
+                {(['carbs', 'protein', 'fat'] as const).map((k, i) => (
+                  <View key={k} style={[styles.macro, i > 0 && styles.macroSep]}>
+                    <Text style={styles.caption}>{t(`home.${k}`)}</Text>
+                    <Text style={styles.macroNum}>
+                      {roundGram(nutrition[k])}
+                      {t('common.gram')}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </Card>
+        {analyzing ? null : (
+          <Pressable
+            onPress={() => setNutritionOpen(true)}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={({ pressed }) => [styles.editLink, pressed && styles.pressed]}
+          >
+            <Text style={styles.editLinkText}>{t('review.editNutrition')}</Text>
+            <ChevronRight size={16} color={c.sub} strokeWidth={1.8} />
+          </Pressable>
+        )}
+      </View>
+
+      {analyzing ? null : (
+        <View>
+          <View style={styles.sectionHead}>
+            <Text style={styles.heading}>{count > 0 ? t('review.foods', { count }) : t('review.foodsNone')}</Text>
+            <Pressable onPress={() => setEditing({ at: null })} accessibilityRole="button" hitSlop={12}>
+              <Text style={styles.addText}>{t('review.add')}</Text>
+            </Pressable>
           </View>
-        ) : (
-          <>
-            {phase === 'failed' ? (
-              <View style={styles.failed}>
-                <Text style={type.desc}>{t('review.failedDesc')}</Text>
-                <Pressable onPress={() => {
-                    setPhase('analyzing');
-                    setAttempt((a) => a + 1);
-                  }} accessibilityRole="button" hitSlop={8}>
-                  <Text style={styles.link}>{t('review.retry')}</Text>
-                </Pressable>
-              </View>
-            ) : null}
-            {lowConfidence ? <Text style={[type.caption, styles.pad]}>{t('review.confidence')}</Text> : null}
-            {ai.items.length === 0 && phase !== 'failed' ? <Text style={[type.desc, styles.pad]}>{t('review.emptyList')}</Text> : null}
-            {ai.items.map((it, i) => (
+          {phase === 'failed' ? (
+            <View style={styles.notice}>
+              <Text style={styles.bodySub}>
+                {t('review.failedTitle')}. {t('review.failedDesc')}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setPhase('analyzing');
+                  setAttempt((a) => a + 1);
+                }}
+                accessibilityRole="button"
+                hitSlop={8}
+              >
+                <Text style={styles.link}>{t('review.retry')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {lowConfidence ? <Text style={[styles.caption, styles.notice]}>{t('review.confidence')}</Text> : null}
+          {count === 0 && phase !== 'failed' ? (
+            <Text style={[styles.bodySub, styles.notice]}>{t('review.emptyList')}</Text>
+          ) : null}
+          {manualTotals && canPortionPerFood(ai.items) ? (
+            // 합계를 직접 고쳤거나 예전 방식으로 저장된 끼니: 음식별로 다시 계산할 수 있게
+            <View style={styles.notice}>
+              <Text style={styles.caption}>{t('review.mealMode')}</Text>
+              <Pressable onPress={() => setManualTotals(false)} accessibilityRole="button" hitSlop={8}>
+                <Text style={styles.link}>{t('review.perFoodReset')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {ai.items.map((it, i) => {
+            // 표시는 저장할 모양 기준: 끼니 전체 먹은 양이면 음식별 비율은 빠지고 끼니 비율만 곱한다
+            const shown = plan.ai.items[i] ?? it;
+            const eaten = eatenFoodInMeal(shown, plan.portion, shared);
+            const eatenPct = Math.round(foodFactor(shown, plan.portion, shared) * 100);
+            const itemPct = t('review.pct', { pct: Math.round(itemPortion(it) * 100) });
+            return (
               <View key={`${i}-${it.name}`}>
-                <Divider />
-                <ListRow label={it.name} value={it.amount} onPress={() => setEditing({ at: i })} />
+                {i > 0 ? <Divider /> : null}
+                <View style={styles.food}>
+                  <Pressable
+                    onPress={() => setEditing({ at: i })}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.foodText, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.foodName}>{it.name}</Text>
+                    {it.kcal != null ? (
+                      <Text style={styles.bodySub}>
+                        {formatNumber(roundKcal(eaten.kcal))} {t('common.kcal')}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.caption}>
+                      {it.amount ? `${t('review.itemBase', { amount: it.amount })} · ` : ''}
+                      {t('review.itemEaten', { pct: eatenPct })}
+                    </Text>
+                  </Pressable>
+                  {perFood ? (
+                    <Pressable
+                      onPress={() => {
+                        setFoodAt(i);
+                        setFoodOpen(true);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${it.name} ${t('review.howMuch')} ${itemPct}`}
+                      style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.pillText}>{itemPct}</Text>
+                      <ChevronDown size={16} color={c.text} strokeWidth={1.8} />
+                    </Pressable>
+                  ) : (
+                    <ChevronRight size={18} color={c.sub} strokeWidth={1.8} />
+                  )}
+                </View>
               </View>
-            ))}
+            );
+          })}
+        </View>
+      )}
+
+      <View>
+        {perFood ? null : (
+          <>
+            {/* 음식별 숫자가 없는 음식이 있으면 음식별로 계산할 수 없어 끼니 전체 먹은 양을 고른다 */}
+            <View style={styles.row}>
+              <Text style={styles.label}>{t('review.howMuch')}</Text>
+              <Pressable
+                onPress={() => setPortionOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('review.howMuch')} ${t('review.pct', { pct })}`}
+                style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+              >
+                <Text style={styles.pillText}>{t('review.pct', { pct })}</Text>
+                <ChevronDown size={16} color={c.text} strokeWidth={1.8} />
+              </Pressable>
+            </View>
             <Divider />
-            <ListRow
-              label={t('review.addItem')}
-              labelBold
-              onPress={() => setEditing({ at: null })}
-              right={<Plus size={20} color={colors.text} strokeWidth={1.8} />}
-            />
           </>
         )}
-      </Card>
-
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>{t('review.howMuch')}</Text>
-        <Segmented
-          height={56}
-          value={portion}
-          onChange={setPortion}
-          options={PORTIONS.map((p) => ({ value: p, label: portionLabels[p] }))}
-        />
         <ListRow
           label={t('review.shared')}
-          sub={t('review.sharedDesc')}
+          desc={t('review.sharedDesc')}
           right={<Toggle value={shared} onChange={setShared} />}
         />
-      </Card>
-
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>{t('review.estimate')}</Text>
-        <Text style={styles.kcalText}>
-          <Text style={styles.approx}>{t('common.approx')} </Text>
-          <Text style={styles.kcal}>{formatNumber(roundKcal(nutrition.kcal))}</Text>
-          <Text style={styles.approx}> {t('common.kcal')}</Text>
-        </Text>
-        <View style={styles.macros}>
-          {(['carbs', 'protein', 'fat'] as const).map((k, i) => (
-            <View key={k} style={[styles.macro, i > 0 && styles.macroSep]}>
-              <Text style={type.caption}>{t(`home.${k}`)}</Text>
-              <Text style={styles.macroNum}>
-                {t('common.approx')} {roundGram(nutrition[k])}
-                {t('common.gram')}
-              </Text>
-            </View>
-          ))}
-        </View>
         <Divider />
-        <ListRow label={t('review.editNutrition')} onPress={() => setNutritionOpen(true)} />
-      </Card>
+        <ListRow
+          label={t('review.shareFriends')}
+          desc={t('review.shareFriendsDesc')}
+          right={<Toggle value={shareFriends} onChange={setShareFriends} />}
+        />
+      </View>
 
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>{t('review.whichMeal')}</Text>
-        <MealChips meals={meals.map((m) => ({ index: m.index, logged: m.state === 'logged' }))} value={chosen} onChange={setMealIndex} />
-        {already ? <Text style={type.caption}>{t('review.overwrite')}</Text> : null}
-      </Card>
+      {savedDay ? (
+        // 수정: 끼니는 바꿀 수 없다 (같은 날·같은 끼니를 덮어쓴다)
+        <ListRow
+          label={t('review.mealLabel')}
+          value={t('review.mealOf', { month: savedDay.getMonth() + 1, day: savedDay.getDate(), n: saved!.index })}
+        />
+      ) : (
+        <View style={styles.mealBlock}>
+          <Text style={styles.heading}>{t('review.whichMeal')}</Text>
+          <MealChips
+            meals={meals.map((m) => ({ index: m.index, logged: m.state === 'logged' }))}
+            value={chosen}
+            onChange={setMealIndex}
+          />
+          {already ? <Text style={styles.caption}>{t('review.overwrite')}</Text> : null}
+        </View>
+      )}
 
-      <Text style={[type.caption, styles.note]}>{t('review.photoNote')}</Text>
+      <Text style={styles.caption}>{t(photoNote)}</Text>
 
       <ItemSheet
         visible={editing !== null}
@@ -257,35 +466,100 @@ export default function ReviewScreen() {
       />
       <NutritionSheet
         visible={nutritionOpen}
-        value={ai}
+        value={plan.ai}
+        desc={perFood ? t('review.nutritionPerFoodDesc') : undefined}
         onClose={() => setNutritionOpen(false)}
         onSave={(v) => {
+          // 음식별 합계를 고쳤으면 그 값이 먹은 양이라 끼니 먹은 양은 100%에서 시작한다
+          if (perFood) setPortion(1);
           setAi((p) => ({ ...p, ...v }));
+          setManualTotals(true);
           setNutritionOpen(false);
         }}
       />
+      <PortionSheet
+        visible={portionOpen}
+        value={portion}
+        options={PORTIONS}
+        preview={(p) => applyPortion(plan.ai, p, shared)}
+        desc={t('review.howMuchDesc')}
+        onClose={() => setPortionOpen(false)}
+        onApply={(p) => {
+          setPortion(p);
+          setPortionOpen(false);
+        }}
+      />
+      {food ? (
+        <PortionSheet
+          visible={foodOpen}
+          value={
+            (ITEM_PORTIONS as readonly number[]).includes(itemPortion(food)) ? (itemPortion(food) as ItemPortion) : 1
+          }
+          options={ITEM_PORTIONS}
+          preview={(p) => eatenFoodInMeal({ ...food, portion: p }, 1, shared)}
+          food={{ name: food.name, amount: food.amount }}
+          onClose={() => setFoodOpen(false)}
+          onApply={(p) => setFoodPortion(foodAt, p)}
+        />
+      ) : null}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  back: { flexDirection: 'row', alignItems: 'center', gap: space.s, height: 44, marginTop: space.s },
-  backTitle: { fontFamily: fonts.medium, fontSize: 17, color: colors.text },
-  photo: { width: '100%', height: 240, borderRadius: radius.card, backgroundColor: colors.line },
-  card: { gap: space.m },
-  cardTitle: { ...type.heading },
-  analyzing: { flexDirection: 'row', alignItems: 'center', gap: space.s, paddingVertical: space.s },
-  failed: { gap: space.s },
-  link: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, textDecorationLine: 'underline' },
-  pad: { paddingBottom: space.xs },
-  kcalText: { fontFamily: fonts.regular, color: colors.sub },
-  approx: { fontFamily: fonts.regular, fontSize: 17, color: colors.sub },
-  kcal: { ...type.number, color: colors.text },
-  macros: { flexDirection: 'row' },
-  macro: { flex: 1, gap: 2, paddingLeft: space.s },
-  macroSep: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.line },
-  macroNum: { fontFamily: fonts.semibold, fontSize: 17, color: colors.text, fontVariant: ['tabular-nums'] },
-  note: { marginHorizontal: space.xs, marginBottom: space.m },
-  footer: { gap: space.s },
-  error: { ...type.caption, textAlign: 'center', color: colors.text },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    headerRight: { ...text.body, color: c.sub },
+    when: { ...text.caption, color: c.sub, marginBottom: 12 },
+    top: { gap: 12 },
+    photo: { width: '100%', height: 160, borderRadius: radius.card, backgroundColor: c.card },
+    related: { gap: 12 },
+    summary: { padding: 20, gap: layout.related },
+    analyzing: { flexDirection: 'row', alignItems: 'center', gap: layout.related, paddingVertical: 12 },
+    kcalLine: { color: c.text },
+    kcal: { fontFamily: fonts.bold, fontSize: 40, lineHeight: 48, color: c.text, fontVariant: ['tabular-nums'] },
+    kcalUnit: { fontFamily: fonts.medium, fontSize: 20, color: c.text },
+    macros: { flexDirection: 'row', marginTop: 12 },
+    macro: { flex: 1, alignItems: 'center', gap: 4 },
+    macroSep: { borderLeftWidth: layout.hairline, borderLeftColor: c.line },
+    macroNum: { ...text.label, fontSize: 17, color: c.text, fontVariant: ['tabular-nums'] },
+    editLink: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 2 },
+    editLinkText: { ...text.caption, color: c.sub },
+    row: {
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    label: { ...text.label, color: c.text, flexShrink: 1 },
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      height: 40,
+      paddingHorizontal: 14,
+      borderRadius: radius.field,
+      backgroundColor: c.selected,
+    },
+    pillText: { ...text.bodyMedium, color: c.text, fontVariant: ['tabular-nums'] },
+    sectionHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 4,
+    },
+    heading: { ...text.heading, color: c.text },
+    addText: { ...text.bodyMedium, color: c.sub },
+    notice: { paddingVertical: 12, gap: layout.related },
+    link: { ...text.bodyMedium, color: c.text, textDecorationLine: 'underline' },
+    food: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+    foodText: { flex: 1, gap: 2 },
+    foodName: { ...text.label, fontFamily: fonts.semibold, color: c.text },
+    mealBlock: { gap: 12 },
+    bodyText: { ...text.body, color: c.text },
+    bodySub: { ...text.body, color: c.sub },
+    caption: { ...text.caption, color: c.sub },
+    error: { ...text.caption, textAlign: 'center', color: c.text },
+    pressed: { opacity: 0.6 },
+  });

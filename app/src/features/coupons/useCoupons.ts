@@ -20,8 +20,10 @@
  *   (실제 네이티브 잠금 해제는 호출한 쪽이 confirmed를 보고 처리한다.)
  *
  *   confirmRestCoupon(now?: Date): boolean   // 훅 없이 바로 확정. 남은 장수가 없으면 false
+ *
+ *   useGymDoneToday(): boolean   // 오늘 헬스 인증(휴식권 포함)을 마쳤는지. 쿠폰 시트가 휴식권 조건에 쓴다.
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -41,9 +43,21 @@ export function useCouponStatus(now: Date = new Date()): CouponStatus {
   return useMemo(() => couponStatus(s.coupons, data, now), [s.coupons, data, wk]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+/** 오늘 헬스를 인증(위치·사진·휴식권)했는지. 헬스 상세의 doneToday와 같은 기준이다. */
+export function useGymDoneToday(now: Date = new Date()): boolean {
+  const today = dateKey(now);
+  const { data } = useLiveQuery(
+    db
+      .select({ date: gymLogs.date })
+      .from(gymLogs)
+      .where(and(eq(gymLogs.date, today), isNotNull(gymLogs.verifiedBy))),
+    [today],
+  );
+  return data.some((r) => r.date === today);
+}
+
 export function confirmRestCoupon(now: Date = new Date(), total?: { rest: number; cheat: number }): boolean {
-  const coupons =
-    total ?? (db.select().from(settingsTable).get()?.json.coupons ?? { rest: 0, cheat: 0 });
+  const coupons = total ?? db.select().from(settingsTable).get()?.json.coupons ?? { rest: 0, cheat: 0 };
   const status = couponStatus(coupons, db.select().from(couponUses).all(), now);
   if (!canUse(status, 'rest')) return false;
   const ts = now.getTime();
@@ -54,7 +68,9 @@ export function confirmRestCoupon(now: Date = new Date(), total?: { rest: number
     .where(and(eq(lockEvents.type, 'gym'), isNull(lockEvents.endedAt)))
     .all();
   db.transaction((tx) => {
-    tx.insert(couponUses).values({ type: 'rest', usedAt: ts, weekKey: weekKey(now) }).run();
+    tx.insert(couponUses)
+      .values({ type: 'rest', usedAt: ts, weekKey: weekKey(now) })
+      .run();
     tx.insert(gymLogs)
       .values({ date: today, verifiedBy: 'rest' })
       .onConflictDoUpdate({ target: gymLogs.date, set: { verifiedBy: 'rest' } })
