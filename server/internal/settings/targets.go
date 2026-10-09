@@ -2,7 +2,9 @@ package settings
 
 import "github.com/yuntyu01/fitdoing/server/internal/platform"
 
-// MinKcal is the floor for the daily target (app policy).
+// MinKcal is the app's floor for targets it helps set (existing policy since the first version: age and sex were
+// not collected, so a fixed value stood in for "not below BMR"). It is not a medical safety line for everyone.
+// Auto recommendations below it are refused; PUT /api/settings refuses it; backups and meal logging never check it.
 const MinKcal = 1200
 
 const fatRatio = 0.25

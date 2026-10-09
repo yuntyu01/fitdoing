@@ -149,7 +149,8 @@ func RecommendEER(goal Goal, b Body, mode string) (Recommendation, error) {
 	adj := goalAdjustStart(goal)
 	kcal := float64(round(maint*(1+adj/100)/50) * 50)
 	if kcal < MinKcal {
-		return Recommendation{}, platform.BadRequest("TARGET_BELOW_MINIMUM", fmt.Sprintf("목표 칼로리가 %dkcal보다 낮아요", MinKcal))
+		return Recommendation{}, platform.BadRequest("TARGET_BELOW_MINIMUM",
+			fmt.Sprintf("자동 추천 결과가 앱의 목표 범위(%dkcal 이상)보다 낮아요. 조정률을 줄이거나 전문가와 목표를 정하세요", MinKcal))
 	}
 	var c, p, f float64
 	switch mode {
@@ -221,6 +222,37 @@ func validFasting(m map[string]any) bool {
 	f, _ := m["eatFrom"].(string)
 	t, _ := m["eatTo"].(string)
 	return ValidHHMM(f) && ValidHHMM(t)
+}
+
+// ── saves from apps older than 2026-10 ─────────────────────────────────────────
+
+// fromOlderApp: the request has no "nutrition" key. Apps from 2026-10 on always send it (null or an object).
+func (s Settings) fromOlderApp() bool { return !s.Nutrition.Set }
+
+// protectFromOlderApp keeps what an older app would overwrite without meaning to:
+//   - goal "bulk": an older app doesn't know it and shows/sends its fallback "keep". A stored bulk stays when an
+//     older app sends keep (it can still pick lose or gain). Switching bulk -> keep needs a current app.
+//   - targets: once a current app has applied targets (nutrition inputs stored), an older app that sends targets
+//     equal to an earlier entry of the history is sending its stale copy (it saves the whole settings on any
+//     change, e.g. a meal time). The current targets stay. A value never applied before is a deliberate edit in
+//     the older app and is accepted (recorded in the history; the stored inputs then no longer match, see docs).
+func (s *Settings) protectFromOlderApp(stored Settings) {
+	if stored.Goal == GoalBulk && s.Goal == GoalKeep {
+		s.Goal = GoalBulk
+	}
+	if stored.Nutrition.Val == nil || stored.TargetHistory.Val == nil || s.Targets == nil || stored.Targets == nil {
+		return
+	}
+	if *s.Targets == *stored.Targets {
+		return
+	}
+	for _, e := range *stored.TargetHistory.Val {
+		if e.Targets == *s.Targets {
+			cur := *stored.Targets
+			s.Targets = &cur
+			return
+		}
+	}
 }
 
 // ── targets per date ─────────────────────────────────────────────────────────

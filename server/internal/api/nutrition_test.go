@@ -245,3 +245,101 @@ func TestMigrateUpgradesSettingsBeforeNutrition(t *testing.T) {
 		t.Fatalf("after second migrate: %+v", again)
 	}
 }
+
+// newAppBulk is what a current app saves after applying "bulk + training + keto": goal, final targets, the
+// calculation inputs (with fields the server does not interpret) and the history from the first change.
+func newAppBulk(t *testing.T) map[string]any {
+	s := parse(t, contract(t, "settings.json"))
+	s["goal"] = "bulk"
+	s["targets"] = map[string]any{"kcal": 3050, "carbs": 50, "protein": 126, "fat": 284}
+	s["nutrition"] = map[string]any{
+		"formula": "kdri2025-eer-adult", "policy": "fitdoing-2026.10", "goalAdjustPct": 15,
+		"plan": map[string]any{"mode": "training", "proteinPerKg": 1.8, "fatPct": 25,
+			"carb": map[string]any{"kind": "keto", "by": "grams", "value": 50}},
+		"eligibility": map[string]any{"pregnant": false, "lactating": false, "medicalDiet": false},
+		"appliedOn":   "2026-10-08",
+	}
+	s["targetHistory"] = []any{
+		map[string]any{"from": "2000-01-01", "kcal": 2100, "carbs": 283, "protein": 112, "fat": 58},
+		map[string]any{"from": "2026-10-08", "kcal": 3050, "carbs": 50, "protein": 126, "fat": 284},
+	}
+	return s
+}
+
+// An older app keeps a stale copy (goal falls back to keep, targets are what it had before) and sends the whole
+// settings whenever anything changes. That save must not wipe bulk, the advanced inputs or the applied targets.
+func TestOlderAppSaveKeepsBulkAndAdvancedTargets(t *testing.T) {
+	for _, path := range []string{"/api/sync/settings", "/api/settings"} {
+		t.Run(path, func(t *testing.T) {
+			e := newEnv(t)
+			e.put("/api/sync/settings", js(newAppBulk(t))).is(t, 200)
+			old := oldAppBody(t)
+			old["goal"] = "keep" // the older app's fallback for an unknown goal
+			old["targets"] = map[string]any{"kcal": 2100, "carbs": 283, "protein": 112, "fat": 58}
+			old["nickname"] = "구버전"
+			e.put(path, js(old)).is(t, 200)
+			for _, r := range []resp{e.get("/api/settings").is(t, 200)} {
+				r.eq(t, "settings.nickname", "구버전") // the older app's own change is kept
+				r.eq(t, "settings.goal", "bulk")
+				r.eq(t, "settings.targets.kcal", float64(3050))
+				r.eq(t, "settings.targets.fat", float64(284))
+				r.eq(t, "settings.nutrition.plan.carb.kind", "keto")
+				r.eq(t, "settings.nutrition.plan.carb.value", float64(50))
+				r.eq(t, "settings.nutrition.goalAdjustPct", float64(15))
+				r.size(t, "settings.targetHistory", 2)
+			}
+			// the restore path (snapshot) returns the same inputs
+			snap := e.get("/api/sync/snapshot").is(t, 200)
+			snap.eq(t, "settings.goal", "bulk")
+			snap.eq(t, "settings.nutrition.plan.mode", "training")
+			snap.eq(t, "settings.nutrition.plan.carb.kind", "keto")
+		})
+	}
+}
+
+// Deliberate changes in an older app still go through: another goal, or targets never applied before.
+func TestOlderAppDeliberateChangesAccepted(t *testing.T) {
+	e := newEnv(t)
+	e.put("/api/sync/settings", js(newAppBulk(t))).is(t, 200)
+	old := oldAppBody(t)
+	old["goal"] = "lose"
+	old["targets"] = map[string]any{"kcal": 2400, "carbs": 260, "protein": 150, "fat": 85}
+	r := e.put("/api/sync/settings", js(old)).is(t, 200)
+	r.eq(t, "settings.goal", "lose")
+	r.eq(t, "settings.targets.kcal", float64(2400))
+	r.size(t, "settings.targetHistory", 3)
+	// the inputs of the last calculation stay (targets win; the app shows the difference before the next apply)
+	r.eq(t, "settings.nutrition.plan.carb.kind", "keto")
+}
+
+// A current app may set any goal, including keep after bulk.
+func TestCurrentAppCanLeaveBulk(t *testing.T) {
+	e := newEnv(t)
+	e.put("/api/sync/settings", js(newAppBulk(t))).is(t, 200)
+	s := newAppBulk(t)
+	s["goal"] = "keep"
+	e.put("/api/sync/settings", js(s)).is(t, 200).eq(t, "settings.goal", "keep")
+}
+
+// The recommend API only calculates; it never touches stored settings.
+func TestRecommendDoesNotTouchSettings(t *testing.T) {
+	e := newEnv(t)
+	e.put("/api/sync/settings", js(newAppBulk(t))).is(t, 200)
+	e.do("GET", "/api/targets/recommend?goal=keep&weightKg=70&heightCm=172&age=40&sex=male&activity=low", "", "").is(t, 200)
+	r := e.get("/api/settings").is(t, 200)
+	r.eq(t, "settings.targets.kcal", float64(3050))
+	r.eq(t, "settings.nutrition.plan.carb.kind", "keto")
+}
+
+// The 1200 kcal floor limits which targets the app helps set; it never blocks logging meals. Settings backed up
+// with a lower target (older data, or set elsewhere) still log, show today and the weekly graph.
+func TestTargetFloorNeverBlocksLogging(t *testing.T) {
+	e := newEnv(t)
+	s := parse(t, contract(t, "settings.json"))
+	s["targets"] = map[string]any{"kcal": 1000, "carbs": 100, "protein": 60, "fat": 40}
+	s["targetHistory"] = []any{}
+	e.put("/api/sync/settings", js(s)).is(t, 200).eq(t, "settings.targets.kcal", float64(1000))
+	e.post("/api/meals", mealBody("2026-09-26", 1, 1, 1500, false)).is(t, 200) // over the target too
+	e.get("/api/today?date=2026-09-26").is(t, 200).eq(t, "targets.kcal", 1000)
+	e.get("/api/stats/weekly?date=2026-09-26").is(t, 200)
+}

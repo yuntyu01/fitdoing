@@ -206,7 +206,8 @@
     "err": {
       "ratioSum": "Make the ratio add up to 100%.",
       "negative": "Not enough calories left, so {{macro}} goes below zero. Change the targets or calories.",
-      "belowMin": "Target calories are below {{min}} kcal. Change the adjustment or inputs.",
+      "belowMinAuto": "The automatic result is below {{min}} kcal, so it is not recommended. Lower the adjustment. Targets outside this app's range ({{min}} kcal and up) should be set with a professional.",
+      "belowMinCustom": "Custom targets in this app start at {{min}} kcal. If you need a lower target, set it with a professional. Logging meals works regardless of the target.",
       "carbOverKcal": "The carb target is larger than total calories.",
       "invalid": "Some fields are empty or not numbers."
     }

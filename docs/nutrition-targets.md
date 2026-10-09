@@ -60,7 +60,7 @@
 |---|---|---|
 | 목표 조정률 시작값 | 감량 −20%, 유지 0, 린매스업 +10%, 벌크업 +20% | 사용자가 −35~+35%(5% 단위)로 바꿀 수 있다. 모두에게 맞는 값이 아니다 |
 | 반올림 | 조정한 kcal을 **50kcal 단위로 한 번** 반올림하고, 그 kcal로 탄단지를 나눈다 | 중간 계산은 반올림하지 않는다. 적용할 때 g은 정수로 저장한다(서버·기존 데이터 호환) |
-| 최저 목표 | 1200kcal | 이보다 낮으면 조용히 올리지 않고 오류를 낸다 |
+| 최저 목표 | 1200kcal | 기존 정책이다. 아래 "1,200kcal 하한" 참고 |
 | 일반 균형 | 탄수 55 / 단백질 20 / 지방 25 (칼로리 %) | 시작값이다. 하나뿐인 공식 비율이 아니다 |
 | 운동 중심 | 단백질 = 체중 × g/kg (감량 2.0, 유지 1.6, 린매스업·벌크업 1.8), 지방 25%, 탄수화물은 나머지 | 나머지가 음수면 오류를 내고 입력을 고치게 한다 |
 | 직접 설정 프리셋 | 5:3:2, 4:3:3 | 3:4:3은 기본 추천에서 뺐다(직접 입력으로는 가능) |
@@ -70,6 +70,17 @@
 - **활동 단계:** 일상 활동(앉음·서 있음·걷기·육체노동)과 운동(종류·주당 횟수·회당 시간·강도)을 입력받아 저장한다. 다만 이 값으로 단계를 자동으로 정하지 않는다. 검증된 환산표가 없어서 사용자가 단계를 직접 고른다.
 - **운동 칼로리:** 고른 단계에 평소 운동이 포함되므로, 같은 운동의 소모 칼로리를 식사 목표에 다시 더하지 않는다.
 - **자동 계산 대상:** 19세 이상 성인이고 성별·나이·활동 단계가 있어야 한다. 19세 미만이거나 임신·수유·질환 치료 식단이면 일반 균형·운동 중심을 막고 직접 설정만 연다.
+
+### 1,200kcal 하한
+
+- **출처:** 이번에 새로 만든 값이 아니다. 앱 첫 버전(1afb006 `MIN_KCAL`)과 서버 첫 버전(4e257a0 `MinKcal`, `TARGET_BELOW_MINIMUM`)부터 있었다.
+- **처음 근거:** 당시 코드 주석에 따르면 "나이·성별을 받지 않아 기초대사량을 못 구하므로 고정값"으로 두었다. SPEC의 "목표 칼로리는 기초대사량 아래로 설정 불가"를 대신하는 값이다.
+- **성격:** 모든 사람에게 맞는 의학적 안전선이 아니다. 이 앱이 스스로 도와서 정하는 목표의 범위를 정한 앱 정책이다.
+- **적용 범위:**
+  - 자동 추천(일반 균형·운동 중심, 서버 EER 추천 API): 계산 결과가 1,200kcal 미만이면 추천하지 않는다. 조용히 올리지 않고 "조정률을 줄이거나 전문가와 정하라"는 안내를 띄운다.
+  - 직접 설정: 앱에서 정할 수 있는 범위가 1,200kcal 이상이다. 더 낮은 목표는 지원하지 않고 전문가와 정하도록 안내한다. 서버 `PUT /api/settings`도 같은 값으로 막는다.
+  - 막지 않는 곳: 설정 백업(`PUT /api/sync/settings`), 복원, 식사 기록, 오늘·주간 화면은 목표 값을 검사하지 않는다. 1,200kcal 미만 목표가 저장돼 있어도 기록과 조회는 된다(`TestTargetFloorNeverBlocksLogging`, 앱 복원 테스트).
+  - 구형 추천 API(`goal`·`weightKg`만 보내는 요청)는 호환을 위해 예전처럼 1,200으로 올려서 답한다.
 
 ## 3. 음식 데이터와 케토
 
@@ -91,10 +102,17 @@
 - **원본 입력과 최종 목표:** `nutrition`에는 산식 버전, 정책 버전, 모드별 입력, 조정률, 자동 계산 대상 여부, 적용일을 저장한다. 최종 목표는 `targets`에 따로 둔다.
 - **날짜별 목표:** `targetHistory`에 남긴다. 처음 바꿀 때 예전 목표를 2000-01-01부터로 남겨서, 주간 그래프·하루 기록·오늘 화면이 지난 날을 그때 목표로 판단한다.
 - **기존 사용자:** 목표는 다시 계산해서 적용하기 전까지 그대로다. 성별·나이·활동 단계는 `null`(모름)이고, 남성·30세·저활동 같은 값으로 채우지 않는다. 기존 키·몸무게도 실제 정보로 단정하지 않고, 1단계에서 다시 확인한다.
-- **구버전 앱:**
-  - 구버전 앱이 저장해도 새 필드를 지우지 않는다. 서버는 요청에 없는 키를 저장된 값으로 유지하고, `null`을 보내면 지운다.
-  - 구버전 앱이 목표만 바꾸면 서버가 그날부터의 이력을 남긴다.
-  - 남은 위험: 구버전 앱은 `bulk`를 모르기 때문에 그 화면에서 목표를 저장하면 기본값(`keep`)으로 덮을 수 있다. 서버에서는 구분할 수 없다.
+- **구버전 앱 저장:** 구버전 앱은 설정이 바뀔 때마다(끼니 시간 등) 설정 전체를 보낸다. 요청에 `nutrition` 키가 없으면 2026-10 이전 앱으로 보고 아래처럼 처리한다(`protectFromOlderApp`).
+  - 새 필드(성별·나이·활동·계산 입력·이력·음식 선택 방식 등): 키가 없으면 저장된 값을 유지한다. `null`을 보내면 지운다.
+  - `bulk` 목표: 구버전 앱은 `bulk`를 몰라서 대체값 `keep`을 보낸다. 저장된 값이 `bulk`인데 `keep`이 오면 `bulk`를 유지한다. `lose`·`gain`을 고르면 그대로 받는다. `bulk`에서 `keep`으로 바꾸려면 새 앱이 필요하다.
+  - 목표(`targets`): 새 앱으로 목표를 적용한 적이 있을 때(계산 입력이 저장돼 있을 때), 이력에 있던 예전 값과 같은 목표가 오면 오래된 사본으로 보고 지금 목표를 유지한다. 적용한 적 없는 새 값은 구버전 앱에서 일부러 바꾼 것으로 보고 받아들여 이력에 남긴다.
+  - 테스트: `TestOlderAppSaveKeepsBulkAndAdvancedTargets`(보호 코드를 끄면 실패함을 확인), `TestOlderAppDeliberateChangesAccepted`, `TestCurrentAppCanLeaveBulk`.
+  - 한계: 구버전 앱에서 일부러 예전 목표 값으로 되돌리면 오래된 사본과 구분할 수 없어 반영되지 않는다.
+- **계산 입력과 최종 목표가 다를 때:** 최종 목표(`targets`)가 기준이다. 오늘 화면, 기록, 주간 그래프, 서버 통계는 모두 `targets`와 이력만 본다.
+  - 계산 입력(`nutrition`)은 "마지막으로 적용할 때 쓴 값"이고, 영양 목표 화면을 다시 열 때 입력칸을 채우는 데만 쓴다.
+  - 앱·서버 어디에서도 저장·복원·추천 때 입력으로 목표를 다시 계산해 덮어쓰지 않는다.
+  - 둘이 달라지는 경우: 구버전 앱에서 목표를 바꿨거나, 적용한 뒤 프로필에서 체중 등을 바꾼 경우다. 다음에 결과 화면에서 "지금 목표 → 새 목표"를 보여주고, 사용자가 적용해야 바뀐다.
+  - 서버는 계산 입력의 모양만 검사하고 내용은 그대로 저장한다. 고급 탄수 제한 계산은 앱에만 있고, 서버 추천 API는 일반 균형·운동 중심 시작값만 계산한다(저장 값에 영향 없음, `TestRecommendDoesNotTouchSettings`).
 - **목표 값:** `gain`은 예전 "증량" 값을 그대로 린매스업으로 쓴다. `bulk`는 새로 추가했다.
 - **DB 업그레이드:**
   - 목표 CHECK 제약을 `ck_user_settings_goal_v2`로 새로 만들고, 예전 `ck_user_settings_goal`은 지운다.
@@ -103,3 +121,34 @@
   - `GET /api/targets/recommend?goal=&weightKg=`(구형 요청)는 예전 체중 기반 값을 그대로 돌려준다.
   - `heightCm`, `age`, `sex`, `activity`를 함께 보내면 EER 기반 값을 돌려준다(`mode=balanced|training`).
 - **잠금과 무관:** 섭취량, 칼로리 초과, 단백질 미달은 잠금 조건이 아니다.
+
+## 6. 운영 DB 마이그레이션 (이 변경을 처음 배포할 때)
+
+현재 운영 스키마(0a95524)에서 시작한 임시 Postgres로 확인했다. 서버가 시작할 때 실행되는 DDL은 아래가 전부다.
+
+```sql
+ALTER TABLE "user_settings" ADD "sex" varchar(8);
+ALTER TABLE "user_settings" ADD "age" bigint;
+ALTER TABLE "user_settings" ADD "activity" varchar(12);
+ALTER TABLE "user_settings" ADD "inputs" text;
+ALTER TABLE "user_settings" ADD CONSTRAINT "ck_user_settings_sex" CHECK (sex IN ('male','female'));
+ALTER TABLE "user_settings" ADD CONSTRAINT "ck_user_settings_goal_v2" CHECK (goal IN ('lose','keep','gain','bulk'));
+ALTER TABLE "user_settings" ADD CONSTRAINT "ck_user_settings_activity" CHECK (activity IN ('sedentary','low','active','veryActive'));
+CREATE TABLE "target_history" (... PRIMARY KEY (user_id, from_date), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE);
+ALTER TABLE "user_settings" DROP CONSTRAINT "ck_user_settings_goal";
+```
+
+- **기존 행:** 바꾸지 않는다. 새 컬럼은 NULL이고, 기존 목표 값(lose·keep·gain)은 새 CHECK를 통과한다. 확인 결과 goal=gain, 2,800kcal이 그대로였다.
+- **배포 전:** `pg_dump`로 백업한다.
+- **예전 코드로 되돌릴 때:**
+  - 예전 서버는 새 컬럼·테이블을 무시하고 기동한다. 업그레이드된 DB에서 0a95524 코드가 마이그레이션까지 통과하는 것을 확인했다.
+  - 예전 서버는 시작할 때 `ck_user_settings_goal`(bulk 없음)을 다시 만든다. 그래서 그사이 `goal='bulk'`인 행이 생겼다면 기동이 실패한다. 되돌리기 전에 `SELECT count(*) FROM user_settings WHERE goal='bulk'`로 확인하고, 있으면 그 행을 어떻게 할지(예: `gain`으로 바꿀지) 먼저 정해야 한다. 이건 데이터 변경이다.
+- **스키마까지 완전히 되돌릴 때:**
+
+```sql
+DROP TABLE target_history;
+ALTER TABLE user_settings DROP CONSTRAINT ck_user_settings_goal_v2, DROP CONSTRAINT ck_user_settings_sex, DROP CONSTRAINT ck_user_settings_activity;
+ALTER TABLE user_settings DROP COLUMN sex, DROP COLUMN age, DROP COLUMN activity, DROP COLUMN inputs;
+```
+
+- **배포 방식:** KoDeploy 자동 배포는 꺼져 있다. main에 푸시해도 배포되지 않고, 대시보드에서 재배포해야 반영된다.

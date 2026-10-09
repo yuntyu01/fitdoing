@@ -353,3 +353,13 @@ describe('snapshotToRows', () => {
     expect(rows.lockEvents).toHaveLength(0);
   });
 });
+
+describe('계산 입력과 최종 목표가 다를 때', () => {
+  it('복원은 저장된 최종 목표를 그대로 쓰고 입력으로 다시 계산하지 않는다', () => {
+    // 입력(운동 중심 1.8g/kg)으로 계산하면 다른 값이 나오지만, 적용된 목표(targets)가 기준이다
+    const body = { ...wire(toSettingsBody(mine)), targets: { kcal: 1000, carbs: 100, protein: 60, fat: 40 } };
+    const s = fromSettingsBody(body, defaults);
+    expect(s.targets).toEqual({ kcal: 1000, carbs: 100, protein: 60, fat: 40 }); // 1200 미만도 그대로 (기록은 막지 않는다)
+    expect(s.nutrition).toEqual(mine.nutrition);
+  });
+});

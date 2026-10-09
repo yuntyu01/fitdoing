@@ -137,8 +137,12 @@ type Settings struct {
 	Fasting       Opt[json.RawMessage] `json:"fasting"`       // eating window (structure only)
 }
 
-// Merge keeps the stored value of every newer field the request left out (an older app's save).
+// Merge keeps the stored value of every newer field the request left out (an older app's save), and keeps the
+// goal and targets an older app can't represent or only has a stale copy of (see protectFromOlderApp).
 func (s *Settings) Merge(stored Settings) {
+	if s.fromOlderApp() {
+		s.protectFromOlderApp(stored)
+	}
 	s.Sex = s.Sex.or(stored.Sex)
 	s.Age = s.Age.or(stored.Age)
 	s.Activity = s.Activity.or(stored.Activity)

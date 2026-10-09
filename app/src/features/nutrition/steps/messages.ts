@@ -20,7 +20,10 @@ export function calcErrorText(t: TFunction, f: NutritionForm, r: CalcResult): st
       return t('nutrition.err.negative', { macro: neg ? t(`macro.${neg}`) : '' });
     }
     case 'belowMin':
-      return t('nutrition.err.belowMin', { min: formatNumber(MIN_KCAL) });
+      // 자동 추천은 이 범위 아래 목표를 내지 않고, 직접 설정도 이 앱에서는 이 범위까지만 지원한다(앱 정책)
+      return t(f.mode === 'custom' ? 'nutrition.err.belowMinCustom' : 'nutrition.err.belowMinAuto', {
+        min: formatNumber(MIN_KCAL),
+      });
     case 'carbOverKcal':
       return t('nutrition.err.carbOverKcal');
     default:
