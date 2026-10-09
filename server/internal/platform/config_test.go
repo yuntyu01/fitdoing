@@ -19,6 +19,12 @@ func TestDatabaseFromHostInjectedVariables(t *testing.T) {
 		{"DB_HOST default port, sslmode", map[string]string{"DB_HOST": "db", "DB_NAME": "fit", "DB_USER": "app",
 			"DB_PASSWORD": "pw", "DB_SSLMODE": "require"}, "postgres://app:pw@db:5432/fit?sslmode=require"},
 		{"nothing set", map[string]string{}, defaultPostgresDSN},
+		// some hosts inject a SQLAlchemy URL; the Go driver can't parse "postgresql+psycopg2://" (deploy of 2026-10-09)
+		{"SQLAlchemy psycopg2 URL", map[string]string{"DATABASE_URL": "postgresql+psycopg2://app:s3cr%40t@postgres:5432/app"},
+			"postgres://app:s3cr%40t@postgres:5432/app"},
+		{"SQLAlchemy asyncpg URL", map[string]string{"DATABASE_URL": "postgres+asyncpg://app:pw@db/app?sslmode=require"},
+			"postgres://app:pw@db/app?sslmode=require"},
+		{"postgresql:// kept", map[string]string{"DATABASE_URL": "postgresql://app:pw@db/app"}, "postgresql://app:pw@db/app"},
 	}
 	for _, c := range cases {
 		c.env["AUTH_SECRET"] = secret

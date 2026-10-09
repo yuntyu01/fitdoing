@@ -97,7 +97,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		}
 	}
 
-	url := firstNonEmpty(getenv("DB_URL"), getenv("DATABASE_URL"), hostDSN(getenv))
+	url := goPostgresURL(firstNonEmpty(getenv("DB_URL"), getenv("DATABASE_URL"), hostDSN(getenv)))
 	c.DBDriver = strings.ToLower(strings.TrimSpace(getenv("DB_DRIVER")))
 	if strings.HasPrefix(url, "sqlite:") {
 		c.DBDriver = "sqlite"
@@ -128,6 +128,21 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return c, fmt.Errorf("AUTH_SECRET은 32자 이상이어야 해요 (예: openssl rand -hex 32)")
 	}
 	return c, nil
+}
+
+// goPostgresURL turns a SQLAlchemy-style URL ("postgresql+psycopg2://...", "postgres+asyncpg://...") that some
+// hosts inject into DATABASE_URL into the plain "postgres://..." form the Go driver (pgx) parses. The driver
+// part names a Python library and means nothing to Go; everything after "://" is kept as is.
+func goPostgresURL(u string) string {
+	scheme, rest, ok := strings.Cut(u, "://")
+	if !ok {
+		return u
+	}
+	base, _, hasDriver := strings.Cut(strings.ToLower(scheme), "+")
+	if hasDriver && (base == "postgresql" || base == "postgres") {
+		return "postgres://" + rest
+	}
+	return u
 }
 
 func firstNonEmpty(vs ...string) string {
