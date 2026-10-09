@@ -154,15 +154,15 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        {/* 잠금 관련 값은 잠금 기능과 함께 편집을 연다. 지금은 값만 보여준다. */}
-        <Section title={t('settings.sectionLock')} note={t('settings.lockSoon')}>
-          <ListRow disabled label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />
+        <Section title={t('settings.sectionLock')}>
+          <ListRow label={t('lockSetup.title')} onPress={go('/edit/lock' as Href)} />
+          <ListRow onPress={go('/edit/lock' as Href)} label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />
           <ListRow
-            disabled
+            onPress={go('/edit/lock' as Href)}
             label={t('settings.emergency')}
             value={t('settings.emergencyValue', { n: s.emergencyPerWeek })}
           />
-          <ListRow disabled label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />
+          <ListRow onPress={go('/edit/lock' as Href)} label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />
         </Section>
 
         <Section

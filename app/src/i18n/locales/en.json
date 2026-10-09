@@ -526,5 +526,24 @@
   "placeholder": {
     "records": "Records are coming soon"
   },
-  "share": {"title": "Share page", "desc": "A page of your meals anyone with the link can view, no login needed. It shows only meals shared with friends, from the last 14 days.", "toggle": "Turn on share page", "toggleDesc": "Turning it off blocks the link right away", "address": "Your page address", "send": "Send link", "open": "Open page", "rotate": "Make a new link", "rotateTitle": "Make a new link?", "rotateBody": "The current link will stop working. You'll need to send the new one.", "note": "Only meals with 'Share with friends' turned on appear. The address is random and can't be guessed.", "failed": "Couldn't change it. Please try again later", "loadFailed": "Couldn't load the share page", "retry": "Try again"}
+  "share": {"title": "Share page", "desc": "A page of your meals anyone with the link can view, no login needed. It shows only meals shared with friends, from the last 14 days.", "toggle": "Turn on share page", "toggleDesc": "Turning it off blocks the link right away", "address": "Your page address", "send": "Send link", "open": "Open page", "rotate": "Make a new link", "rotateTitle": "Make a new link?", "rotateBody": "The current link will stop working. You'll need to send the new one.", "note": "Only meals with 'Share with friends' turned on appear. The address is random and can't be guessed.", "failed": "Couldn't change it. Please try again later", "loadFailed": "Couldn't load the share page", "retry": "Try again"},
+  "lockSetup": {
+    "title": "Lock settings and permissions",
+    "permissions": "Set up app locking",
+    "disclosure": "Restrict other apps at meal deadlines and workout or sleep times. Usage access identifies the app in use; display over other apps shows the lock screen. This is processed on your device. App blocking requires these permissions. An ongoing notification appears while locking is active.",
+    "usageAccess": "Usage access",
+    "usageAccessDesc": "Identify the app currently in use.",
+    "overlay": "Display over other apps",
+    "overlayDesc": "Show the lock screen over a restricted app.",
+    "exactAlarm": "Alarms and reminders",
+    "exactAlarmDesc": "Start locking on schedule even when the app is closed.",
+    "notifications": "Notifications",
+    "notificationsDesc": "Show locking status and deadline reminders.",
+    "allowed": "Allowed",
+    "setup": "Set up",
+    "unavailable": "Native app locking is unavailable in this build.",
+    "openFailed": "Could not open settings. Check FitDoing permissions in Android Settings.",
+    "minutes": "{{n}} minutes",
+    "alwaysAllowed": "Phone, messages, maps, alarms, keyboard and FitDoing stay available. Select any additional apps to allow below."
+  }
 }

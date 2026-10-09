@@ -12,7 +12,7 @@ function finish(type: LockType, by: Parameters<typeof closeOpen>[1], now: Date, 
   closeOpen(type, by, now, reason);
   forgetEngineLock();
   getLockEngine()
-    .releaseLock(type)
+    .releaseLock(type, by)
     .catch(() => {});
   useLock.getState().refresh(now);
 }

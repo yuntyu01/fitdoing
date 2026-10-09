@@ -58,6 +58,8 @@ class LockService : Service() {
 
   /** @return 계속 돌아야 하면 true */
   private fun tick(): Boolean {
+    val permissions = Permissions.status(this)
+    if (permissions["usageAccess"] != true || permissions["overlay"] != true) return false
     val now = System.currentTimeMillis()
     val active = LockEngine.activeLocks(this, now)
     if (active.isEmpty()) return false
