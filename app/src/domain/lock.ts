@@ -229,6 +229,7 @@ export const ALWAYS_ALLOWED_PACKAGES = [
   'com.google.android.deskclock',
   'com.sec.android.app.clockpackage',
   'com.android.systemui',
+  'com.android.settings',
 ];
 
 export function allowedPackages(userApps: string[]): string[] {
