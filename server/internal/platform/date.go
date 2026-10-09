@@ -8,7 +8,7 @@ import (
 
 const dateLayout = "2006-01-02"
 
-// Date is a device-local calendar date, "YYYY-MM-DD". Stored and sent as a string.
+// Date is a user-local calendar date, "YYYY-MM-DD". Stored and sent as a string.
 type Date string
 
 func ParseDate(s string) (Date, error) {

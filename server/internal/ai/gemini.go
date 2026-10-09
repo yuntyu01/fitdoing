@@ -16,8 +16,10 @@ import (
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 )
 
-const prompt = `식단 사진이다. 보이는 음식을 이름과 양으로 나열하고 전체 칼로리(kcal)와 탄수화물·단백질·지방(g)을 추정해라.
-음식이 아니면 items를 비우고 숫자는 0, confidence는 0으로 답해라. 한국어로 답해라.`
+// 음식마다 칼로리·탄단지를 따로 받고 끼니 합계는 서버에서 더한다. 합계만 받을 때와 정확도는 같았고(2026-10-09,
+// 실사진 42장), 음식별 값은 나중에 식단 피드백에 쓴다.
+const prompt = `식단 사진이다. 보이는 음식(음료 포함)을 하나씩 나열하고, 각 음식마다 이름, 양, 칼로리(kcal), 탄수화물·단백질·지방(g)을 추정해라.
+음식이 아니면 items를 비우고 confidence는 0으로 답해라. 한국어로 답해라.`
 
 const geminiBase = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -48,11 +50,12 @@ func obj(props map[string]any, required ...string) map[string]any {
 func (g *Gemini) body(image []byte, contentType string) map[string]any {
 	str := map[string]any{"type": "STRING"}
 	num := map[string]any{"type": "INTEGER"}
+	item := obj(map[string]any{"name": str, "amount": str, "kcal": num, "carbs": num, "protein": num, "fat": num},
+		"name", "amount", "kcal", "carbs", "protein", "fat")
 	schema := obj(map[string]any{
-		"items": map[string]any{"type": "ARRAY", "items": obj(map[string]any{"name": str, "amount": str}, "name", "amount")},
-		"kcal":  num, "carbs": num, "protein": num, "fat": num,
+		"items":      map[string]any{"type": "ARRAY", "items": item},
 		"confidence": map[string]any{"type": "NUMBER"},
-	}, "items", "kcal", "carbs", "protein", "fat", "confidence")
+	}, "items", "confidence")
 	return map[string]any{
 		"contents": []any{map[string]any{"parts": []any{
 			map[string]any{"text": prompt},
@@ -114,12 +117,44 @@ func (g *Gemini) call(ctx context.Context, image []byte, contentType string) (Re
 	if len(out.Candidates) == 0 || len(out.Candidates[0].Content.Parts) == 0 {
 		return Result{}, errors.New("gemini: empty response")
 	}
-	var r Result
-	if err := json.Unmarshal([]byte(out.Candidates[0].Content.Parts[0].Text), &r); err != nil {
+	return parseResult(out.Candidates[0].Content.Parts[0].Text)
+}
+
+// parseResult checks the model's JSON like the app's request is checked: every food has a name and all four numbers,
+// ranges via Result.Validate. The meal's totals are the sum of the foods. responseSchema usually holds, but a model
+// can still drop a number (json would leave it 0) or return an out-of-range one; both become AI_FAILED instead of a
+// silent 0 kcal.
+func parseResult(text string) (Result, error) {
+	var raw struct {
+		Items []struct {
+			Name    string `json:"name"`
+			Amount  string `json:"amount"`
+			Kcal    *int   `json:"kcal"`
+			Carbs   *int   `json:"carbs"`
+			Protein *int   `json:"protein"`
+			Fat     *int   `json:"fat"`
+		} `json:"items"` // absent or null = nothing recognised
+		Confidence *float64 `json:"confidence"`
+	}
+	if err := json.Unmarshal([]byte(text), &raw); err != nil {
 		return Result{}, err
 	}
-	if r.Items == nil {
-		r.Items = []Item{}
+	if raw.Confidence == nil {
+		return Result{}, fmt.Errorf("gemini: missing confidence in %q", text)
+	}
+	r := Result{Items: []Item{}, Confidence: *raw.Confidence}
+	for _, it := range raw.Items {
+		if it.Kcal == nil || it.Carbs == nil || it.Protein == nil || it.Fat == nil {
+			return Result{}, fmt.Errorf("gemini: food without numbers in %q", text)
+		}
+		r.Items = append(r.Items, Item{Name: it.Name, Amount: it.Amount, Kcal: it.Kcal, Carbs: it.Carbs, Protein: it.Protein, Fat: it.Fat})
+		r.Kcal += *it.Kcal
+		r.Carbs += *it.Carbs
+		r.Protein += *it.Protein
+		r.Fat += *it.Fat
+	}
+	if err := r.Validate("ai"); err != nil {
+		return Result{}, fmt.Errorf("gemini: %w", err)
 	}
 	return r, nil
 }

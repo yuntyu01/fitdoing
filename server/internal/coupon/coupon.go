@@ -20,13 +20,13 @@ const (
 )
 
 type Use struct {
-	ID       uint          `gorm:"primaryKey;autoIncrement" json:"-"`
-	DeviceID string        `gorm:"column:device_id;size:64;not null;uniqueIndex:ux_coupon_use,priority:1;index:ix_coupon_week,priority:1" json:"-"`
-	Type     Type          `gorm:"column:type;size:10;not null;uniqueIndex:ux_coupon_use,priority:2;check:ck_coupon_uses_type,type IN ('rest','cheat','emergency')" json:"type"`
-	UsedAt   time.Time     `gorm:"column:used_at;not null;uniqueIndex:ux_coupon_use,priority:3" json:"usedAt"`
-	WeekKey  platform.Date `gorm:"column:week_key;size:10;not null;index:ix_coupon_week,priority:2" json:"-"`
+	ID      uint          `gorm:"primaryKey;autoIncrement" json:"-"`
+	UserID  string        `gorm:"column:user_id;size:64;not null;uniqueIndex:ux_coupon_use,priority:1;index:ix_coupon_week,priority:1" json:"-"`
+	Type    Type          `gorm:"column:type;size:10;not null;uniqueIndex:ux_coupon_use,priority:2;check:ck_coupon_uses_type,type IN ('rest','cheat','emergency')" json:"type"`
+	UsedAt  time.Time     `gorm:"column:used_at;not null;uniqueIndex:ux_coupon_use,priority:3" json:"usedAt"`
+	WeekKey platform.Date `gorm:"column:week_key;size:10;not null;index:ix_coupon_week,priority:2" json:"-"`
 
-	Device *platform.Device `gorm:"foreignKey:DeviceID;references:DeviceKey;constraint:OnDelete:CASCADE" json:"-"`
+	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
 func (Use) TableName() string { return "coupon_uses" }
@@ -70,15 +70,15 @@ func NewService(db *gorm.DB, st *settings.Service, g *gym.Service, clock platfor
 	return &Service{db, st, g, clock}
 }
 
-// Summary is this week's coupon state; date is the device-local date.
-func (s *Service) Summary(deviceID string, date platform.Date) (Summary, error) {
-	st, err := s.settings.Current(deviceID)
+// Summary is this week's coupon state; date is the user-local date.
+func (s *Service) Summary(userID string, date platform.Date) (Summary, error) {
+	st, err := s.settings.Current(userID)
 	if err != nil {
 		return Summary{}, err
 	}
 	week := date.Monday()
 	uses := []Use{}
-	if err := s.db.Where("device_id = ? AND week_key = ?", deviceID, week).Order("used_at ASC, id ASC").Find(&uses).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND week_key = ?", userID, week).Order("used_at ASC, id ASC").Find(&uses).Error; err != nil {
 		return Summary{}, err
 	}
 	bal := func(t Type, total int) Balance {
@@ -95,37 +95,37 @@ func (s *Service) Summary(deviceID string, date platform.Date) (Summary, error) 
 }
 
 // UseRest spends a rest coupon and marks that day's gym as rest.
-func (s *Service) UseRest(deviceID string, date platform.Date) error {
-	if err := s.Consume(deviceID, Rest, date); err != nil {
+func (s *Service) UseRest(userID string, date platform.Date) error {
+	if err := s.Consume(userID, Rest, date); err != nil {
 		return err
 	}
-	return s.gym.MarkRest(deviceID, date)
+	return s.gym.MarkRest(userID, date)
 }
 
 // RestSummary spends a rest coupon (POST /api/coupons/rest) and returns the new summary.
-func (s *Service) RestSummary(deviceID string, date platform.Date) (Summary, error) {
-	if err := s.UseRest(deviceID, date); err != nil {
+func (s *Service) RestSummary(userID string, date platform.Date) (Summary, error) {
+	if err := s.UseRest(userID, date); err != nil {
 		return Summary{}, err
 	}
-	return s.Summary(deviceID, date)
+	return s.Summary(userID, date)
 }
 
-func (s *Service) ConsumeEmergency(deviceID string, date platform.Date) error {
-	return s.Consume(deviceID, Emergency, date)
+func (s *Service) ConsumeEmergency(userID string, date platform.Date) error {
+	return s.Consume(userID, Emergency, date)
 }
 
 // TryConsume spends one coupon if any are left. (Cheat coupons never block a meal when empty.)
-func (s *Service) TryConsume(deviceID string, t Type, date platform.Date) (bool, error) {
-	sum, err := s.Summary(deviceID, date)
+func (s *Service) TryConsume(userID string, t Type, date platform.Date) (bool, error) {
+	sum, err := s.Summary(userID, date)
 	if err != nil || sum.balance(t).Left <= 0 {
 		return false, err
 	}
-	u := Use{DeviceID: deviceID, Type: t, UsedAt: s.clock.Now(), WeekKey: date.Monday()}
-	return true, s.db.Omit("Device").Create(&u).Error
+	u := Use{UserID: userID, Type: t, UsedAt: s.clock.Now(), WeekKey: date.Monday()}
+	return true, s.db.Omit("User").Create(&u).Error
 }
 
-func (s *Service) Consume(deviceID string, t Type, date platform.Date) error {
-	ok, err := s.TryConsume(deviceID, t, date)
+func (s *Service) Consume(userID string, t Type, date platform.Date) error {
+	ok, err := s.TryConsume(userID, t, date)
 	if err != nil {
 		return err
 	}

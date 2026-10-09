@@ -7,8 +7,8 @@
     { "date": "2026-09-25", "lockedAt": 1790346600000, "unlockedAt": 1790373600000 }
   ],
   "lockEvents": [
-    { "type": "meal", "date": "2026-09-24", "startedAt": 1790244000000, "endedAt": 1790251200000, "releasedBy": "action" },
-    { "type": "gym", "date": "2026-09-26", "startedAt": 1790416800000, "endedAt": null, "releasedBy": null }
+    { "type": "meal", "date": "2026-09-24", "startedAt": 1790244000000, "endedAt": 1790251200000, "releasedBy": "emergency", "reason": "병원 예약 확인" },
+    { "type": "gym", "date": "2026-09-26", "startedAt": 1790416800000, "endedAt": null, "releasedBy": null, "reason": null }
   ],
   "couponUses": [
     { "type": "rest", "usedAt": 1790160000000, "weekKey": "2026-09-21" }

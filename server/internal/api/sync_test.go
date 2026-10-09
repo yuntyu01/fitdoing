@@ -51,7 +51,7 @@ func counts(e *env, tables ...string) map[string]int {
 	return m
 }
 
-var allTables = []string{"devices", "user_settings", "meal_slots", "gym_days", "allowed_apps", "meal_logs",
+var allTables = []string{"users", "identities", "user_settings", "meal_slots", "gym_days", "allowed_apps", "meal_logs",
 	"meal_items", "gym_logs", "sleep_logs", "lock_events", "coupon_uses"}
 
 // sameSet compares two JSON lists ignoring order.
@@ -93,7 +93,7 @@ func TestSyncSettingsContractIdempotent(t *testing.T) {
 		}
 	}
 	// normalized: one row each for the scalar part, one per child
-	for table, n := range map[string]int{"devices": 1, "user_settings": 1, "meal_slots": 4, "gym_days": 5, "allowed_apps": 1} {
+	for table, n := range map[string]int{"users": 1, "user_settings": 1, "meal_slots": 4, "gym_days": 5, "allowed_apps": 1} {
 		if first[table] != n {
 			t.Fatalf("%s rows = %d, want %d", table, first[table], n)
 		}
@@ -136,7 +136,7 @@ func TestSyncSettingsIsAPlainBackup(t *testing.T) {
 	s["meals"] = []any{map[string]any{"index": 1, "deadline": "08:00"}, map[string]any{"index": 1, "deadline": "09:00"},
 		map[string]any{"index": 2, "deadline": "10:00"}}
 	e.put("/api/sync/settings", js(s)).code(t, 400, "INVALID")
-	e.do("PUT", "/api/sync/settings", contract(t, "settings.json"), "").code(t, 400, "DEVICE_ID")
+	e.do("PUT", "/api/sync/settings", contract(t, "settings.json"), "").code(t, 401, "UNAUTHORIZED")
 }
 
 func TestSyncEventsContractIdempotentAndSnapshot(t *testing.T) {
@@ -209,7 +209,7 @@ func TestSyncEventsRollBackOnBadItem(t *testing.T) {
 	for _, b := range bad {
 		e.post("/api/sync/events", `{"gymLogs":[{"date":"2026-09-25","verifiedBy":"photo","checkInAt":1790330400000}],
 		 "sleepLogs":[{"date":"2026-09-25","lockedAt":1,"unlockedAt":2}],`+b+`}`).code(t, 400, "INVALID")
-		for table, n := range counts(e, allTables...) {
+		for table, n := range counts(e, allTables[2:]...) { // not users/identities: the login made those
 			if n != 0 {
 				t.Fatalf("%s has %d rows after a failed request (%s)", table, n, b)
 			}
@@ -246,13 +246,13 @@ func TestMealItemsNormalizedAndSnapshot(t *testing.T) {
 		t.Fatalf("items = %d", e.count("meal_items"))
 	}
 	// deleting the meal cascades to its items
-	e.do("DELETE", "/api/meals?date=2026-09-26&index=1", "", e.dev).is(t, 204)
+	e.do("DELETE", "/api/meals?date=2026-09-26&index=1", "", e.tok).is(t, 204)
 	if e.count("meal_items") != 0 || e.count("meal_logs") != 0 {
 		t.Fatalf("counts %v", counts(e, allTables...))
 	}
 }
 
-func TestDeviceDeleteCascadesEverywhere(t *testing.T) {
+func TestUserDeleteCascadesEverywhere(t *testing.T) {
 	e := newEnv(t)
 	e.put("/api/sync/settings", contract(t, "settings.json")).is(t, 200)
 	e.post("/api/sync/events", contract(t, "sync-events.json")).is(t, 200)
@@ -262,7 +262,7 @@ func TestDeviceDeleteCascadesEverywhere(t *testing.T) {
 			t.Fatalf("%s is empty before delete", tb)
 		}
 	}
-	if err := e.db.Exec("DELETE FROM devices WHERE device_id = ?", e.dev).Error; err != nil {
+	if err := e.db.Exec("DELETE FROM users WHERE id = ?", e.uid).Error; err != nil {
 		t.Fatal(err)
 	}
 	for _, tb := range allTables {
@@ -270,8 +270,8 @@ func TestDeviceDeleteCascadesEverywhere(t *testing.T) {
 			t.Fatalf("%s still has %d rows", tb, n)
 		}
 	}
-	// a child cannot exist without its device
-	if err := e.db.Exec("INSERT INTO gym_days (device_id, weekday) VALUES ('nobody-here', 1)").Error; err == nil {
+	// a child cannot exist without its user
+	if err := e.db.Exec("INSERT INTO gym_days (user_id, weekday) VALUES ('nobody-here', 1)").Error; err == nil {
 		t.Fatal("foreign key not enforced")
 	}
 }
@@ -317,48 +317,52 @@ func TestEmptySnapshot(t *testing.T) {
 	for _, k := range []string{"meals", "gymLogs", "sleepLogs", "lockEvents", "couponUses"} {
 		r.size(t, k, 0)
 	}
-	e.do("GET", "/api/sync/snapshot", "", "").code(t, 400, "DEVICE_ID")
+	e.do("GET", "/api/sync/snapshot", "", "").code(t, 401, "UNAUTHORIZED")
 }
 
-func TestMigrateLegacySchema(t *testing.T) {
-	db, err := platform.OpenDB("sqlite", ":memory:")
-	if err != nil {
-		t.Fatal(err)
+func TestMigrateDropsDeviceKeyedSchema(t *testing.T) {
+	cases := map[string][]string{
+		"before login (devices table)": {
+			`CREATE TABLE devices (device_id text PRIMARY KEY, created_at datetime NOT NULL)`,
+			`CREATE TABLE meal_logs (id text PRIMARY KEY, device_id text NOT NULL, meal_date text NOT NULL, meal_index integer NOT NULL)`,
+			`INSERT INTO devices VALUES ('legacy-device-1', '2026-09-01 00:00:00')`,
+			`INSERT INTO meal_logs VALUES ('m1','legacy-device-1','2026-09-26',1)`,
+		},
+		"before normalization (settings as JSON)": {
+			`CREATE TABLE user_settings (device_id text PRIMARY KEY, json text NOT NULL, updated_at datetime NOT NULL)`,
+			`INSERT INTO user_settings VALUES ('legacy-device-1', '{}', '2026-09-01 00:00:00')`,
+		},
 	}
-	legacy := []string{
-		`CREATE TABLE user_settings (device_id text PRIMARY KEY, json text NOT NULL, pending_mode text, pending_from text, updated_at datetime NOT NULL)`,
-		`CREATE TABLE meal_logs (id text PRIMARY KEY, device_id text NOT NULL, meal_date text NOT NULL, meal_index integer NOT NULL, deadline text,
-		  barcode text, items_json text, kcal integer, carbs integer, protein integer, fat integer, confidence real, portion real,
-		  shared_meal numeric, cheat numeric, logged_at datetime NOT NULL)`,
-		`INSERT INTO user_settings VALUES ('legacy-device-1', '` + contractLegacyJSON(t) + `', 'mild', '2099-01-04', '2026-09-01 00:00:00')`,
-		`INSERT INTO meal_logs VALUES ('m1','legacy-device-1','2026-09-26',1,'08:00',NULL,'[{"name":"밥","amount":"1공기"},{"name":"김","amount":"2장"}]',300,50,10,5,0.9,1,0,0,'2026-09-26 07:00:00')`,
+	for name, stmts := range cases {
+		t.Run(name, func(t *testing.T) {
+			db, err := platform.OpenDB("sqlite", ":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, q := range stmts {
+				if err := db.Exec(q).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := Migrate(db); err != nil {
+				t.Fatal(err)
+			}
+			m := db.Migrator()
+			if m.HasTable("devices") || m.HasColumn("meal_logs", "device_id") || m.HasColumn("user_settings", "device_id") {
+				t.Fatal("device-keyed schema remains")
+			}
+			e := &env{t: t, db: db, srv: New(db, ai.Mock{}, platform.Clock{Loc: time.UTC}, nil, newAuth(db))}
+			e.tok, e.uid = e.login("someone")
+			e.get("/api/settings").is(t, 200).eq(t, "settings.heightCm", 175)
+			if n := e.count("meal_logs"); n != 0 {
+				t.Fatalf("old rows survived: %d", n)
+			}
+			if err := Migrate(db); err != nil { // running it again keeps the data
+				t.Fatal(err)
+			}
+			if n := e.count("users"); n != 1 {
+				t.Fatalf("users = %d", n)
+			}
+		})
 	}
-	for _, q := range legacy {
-		if err := db.Exec(q).Error; err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := Migrate(db); err != nil {
-		t.Fatal(err)
-	}
-	e := &env{t: t, db: db, dev: "legacy-device-1", srv: New(db, ai.Mock{}, platform.Clock{Loc: time.UTC}, nil)}
-	r := e.get("/api/settings").is(t, 200)
-	r.eq(t, "settings.heightCm", 175)
-	r.eq(t, "pendingMode", "mild")
-	r.size(t, "settings.meals", 4)
-	e.get("/api/meals?date=2026-09-26").is(t, 200)
-	if e.count("meal_items") != 2 || e.count("devices") != 1 {
-		t.Fatalf("counts %v", counts(e, allTables...))
-	}
-	if db.Migrator().HasColumn("meal_logs", "items_json") || db.Migrator().HasColumn("user_settings", "json") {
-		t.Fatal("JSON columns remain")
-	}
-	if err := Migrate(db); err != nil { // running it again is a no-op
-		t.Fatal(err)
-	}
-}
-
-func contractLegacyJSON(t *testing.T) string {
-	b, _ := json.Marshal(parse(t, contract(t, "settings.json")))
-	return string(b)
 }

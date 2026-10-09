@@ -17,6 +17,7 @@ func (e *Error) Error() string { return e.Message }
 
 func BadRequest(code, msg string) *Error { return &Error{http.StatusBadRequest, code, msg} }
 func Conflict(code, msg string) *Error   { return &Error{http.StatusConflict, code, msg} }
+func Unauthorized(msg string) *Error     { return &Error{http.StatusUnauthorized, "UNAUTHORIZED", msg} }
 func NotFound(msg string) *Error         { return &Error{http.StatusNotFound, "NOT_FOUND", msg} }
 
 // Invalid is a validation failure on one field.

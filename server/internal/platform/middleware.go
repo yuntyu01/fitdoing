@@ -52,12 +52,38 @@ func CORS(origins []string) func(http.Handler) http.Handler {
 			}
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				w.Header().Set("Access-Control-Allow-Methods", strings.Join([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, ", "))
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Device-Id")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 				w.Header().Set("Access-Control-Max-Age", "3600")
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// Authenticate reads "Authorization: Bearer <token>". resolve turns the token into a user id (error = invalid,
+// expired or deleted user). A request without the header passes through anonymously; WithUser then refuses it,
+// so public routes (login, healthz) need no list. A header that is present but invalid is refused right here.
+func Authenticate(resolve func(token string) (string, error)) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := r.Header.Get("Authorization")
+			if h == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			token, ok := strings.CutPrefix(h, "Bearer ")
+			if !ok {
+				JSON(w, http.StatusUnauthorized, map[string]string{"code": "UNAUTHORIZED", "message": "로그인이 필요해요"})
+				return
+			}
+			id, err := resolve(strings.TrimSpace(token))
+			if err != nil {
+				JSON(w, http.StatusUnauthorized, map[string]string{"code": "UNAUTHORIZED", "message": "다시 로그인해 주세요"})
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(ContextWithUser(r.Context(), id)))
 		})
 	}
 }

@@ -5,8 +5,8 @@
   "barcode": null,
   "ai": {
     "items": [
-      { "name": "닭가슴살 샐러드", "amount": "1접시" },
-      { "name": "고구마", "amount": "1개" }
+      { "name": "닭가슴살 샐러드", "amount": "1접시", "kcal": 250, "carbs": 10, "protein": 22, "fat": 13, "portion": 1 },
+      { "name": "고구마", "amount": "1개", "kcal": 130, "carbs": 25, "protein": 2, "fat": 3, "portion": 1 }
     ],
     "kcal": 380,
     "carbs": 35,
@@ -16,6 +16,7 @@
   },
   "portion": 1,
   "sharedMeal": false,
+  "shareFriends": false,
   "cheat": false,
   "loggedAt": "2026-09-26T07:48:00.000Z"
 }

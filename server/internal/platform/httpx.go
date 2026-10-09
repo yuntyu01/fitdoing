@@ -1,19 +1,17 @@
 package platform
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
 )
-
-var deviceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 
 // HandlerFunc is a handler that may fail with an error; Handle renders it.
 type HandlerFunc func(w http.ResponseWriter, r *http.Request) error
 
-// DeviceFunc is a handler that needs the validated X-Device-Id.
-type DeviceFunc func(w http.ResponseWriter, r *http.Request, deviceID string) error
+// UserFunc is a handler that needs the logged-in user.
+type UserFunc func(w http.ResponseWriter, r *http.Request, userID string) error
 
 func Handle(h HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -27,12 +25,19 @@ func Handle(h HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// WithDevice validates X-Device-Id (8~64 chars of [A-Za-z0-9_-]) before running h.
-func WithDevice(h DeviceFunc) http.HandlerFunc {
+type userKey struct{}
+
+// ContextWithUser returns ctx carrying the authenticated user id (set by Authenticate).
+func ContextWithUser(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, userKey{}, userID)
+}
+
+// WithUser runs h for the user that Authenticate found; without a valid login it answers 401.
+func WithUser(h UserFunc) http.HandlerFunc {
 	return Handle(func(w http.ResponseWriter, r *http.Request) error {
-		id := r.Header.Get("X-Device-Id")
-		if !deviceIDPattern.MatchString(id) {
-			return BadRequest("DEVICE_ID", "X-Device-Id 헤더가 필요해요 (8~64자 영문·숫자·-_)")
+		id, _ := r.Context().Value(userKey{}).(string)
+		if id == "" {
+			return Unauthorized("로그인이 필요해요")
 		}
 		return h(w, r, id)
 	})

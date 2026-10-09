@@ -19,21 +19,21 @@ func NewService(db *gorm.DB, clock platform.Clock) *Service { return &Service{db
 // WithDB returns the service bound to another handle (a transaction).
 func (s *Service) WithDB(db *gorm.DB) *Service { return &Service{db, s.clock} }
 
-// Exists reports whether settings were ever stored for the device (Get would create defaults).
-func (s *Service) Exists(deviceID string) (bool, error) {
+// Exists reports whether settings were ever stored for the user (Get would create defaults).
+func (s *Service) Exists(userID string) (bool, error) {
 	var n int64
-	err := s.db.Model(&Row{}).Where("device_id = ?", deviceID).Count(&n).Error
+	err := s.db.Model(&Row{}).Where("user_id = ?", userID).Count(&n).Error
 	return n > 0, err
 }
 
 // Get returns the applied settings. A pending mode change whose start date has passed is applied.
-func (s *Service) Get(deviceID string) (View, error) {
-	cur, row, err := s.load(deviceID)
+func (s *Service) Get(userID string) (View, error) {
+	cur, row, err := s.load(userID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if row, err = s.save(deviceID, Defaults(), nil, nil); err != nil {
+		if row, err = s.save(userID, Defaults(), nil, nil); err != nil {
 			return View{}, err
 		}
-		if cur, _, err = s.load(deviceID); err != nil {
+		if cur, _, err = s.load(userID); err != nil {
 			return View{}, err
 		}
 	} else if err != nil {
@@ -41,7 +41,7 @@ func (s *Service) Get(deviceID string) (View, error) {
 	}
 	if row.PendingMode != nil && row.PendingFrom != nil && s.clock.Today() >= *row.PendingFrom {
 		cur.Mode = Mode(*row.PendingMode)
-		if row, err = s.save(deviceID, cur, nil, nil); err != nil {
+		if row, err = s.save(userID, cur, nil, nil); err != nil {
 			return View{}, err
 		}
 	}
@@ -49,20 +49,20 @@ func (s *Service) Get(deviceID string) (View, error) {
 }
 
 // Current is the applied settings only.
-func (s *Service) Current(deviceID string) (Settings, error) {
-	v, err := s.Get(deviceID)
+func (s *Service) Current(userID string) (Settings, error) {
+	v, err := s.Get(userID)
 	return v.Settings, err
 }
 
 // Put validates and stores settings. Lowering the mode applies from next Monday.
-func (s *Service) Put(deviceID string, in Settings) (View, error) {
+func (s *Service) Put(userID string, in Settings) (View, error) {
 	if err := in.Validate(); err != nil {
 		return View{}, err
 	}
 	if err := validateRules(in); err != nil {
 		return View{}, err
 	}
-	cur, err := s.Current(deviceID)
+	cur, err := s.Current(userID)
 	if err != nil {
 		return View{}, err
 	}
@@ -75,7 +75,7 @@ func (s *Service) Put(deviceID string, in Settings) (View, error) {
 		pending, from = &m, &f
 		next.Mode = cur.Mode
 	}
-	row, err := s.save(deviceID, next, pending, from)
+	row, err := s.save(userID, next, pending, from)
 	if err != nil {
 		return View{}, err
 	}
@@ -85,7 +85,7 @@ func (s *Service) Put(deviceID string, in Settings) (View, error) {
 // Backup stores settings exactly as the phone has them (the local copy is the truth): no delayed
 // mode lowering, no 1200 kcal floor, no meal-number continuity check. Only the format is validated.
 // A pending mode change is cleared. The result is read back from the normalized tables.
-func (s *Service) Backup(deviceID string, in Settings) (View, error) {
+func (s *Service) Backup(userID string, in Settings) (View, error) {
 	if err := in.Validate(); err != nil {
 		return View{}, err
 	}
@@ -96,10 +96,10 @@ func (s *Service) Backup(deviceID string, in Settings) (View, error) {
 		}
 		seen[m.Index] = true
 	}
-	if _, err := s.save(deviceID, in, nil, nil); err != nil {
+	if _, err := s.save(userID, in, nil, nil); err != nil {
 		return View{}, err
 	}
-	st, row, err := s.load(deviceID)
+	st, row, err := s.load(userID)
 	if err != nil {
 		return View{}, err
 	}
@@ -132,9 +132,9 @@ func validateRules(s Settings) error {
 }
 
 // save writes the scalar row and replaces the child rows, all in one transaction.
-func (s *Service) save(deviceID string, st Settings, pending *Mode, from *platform.Date) (Row, error) {
+func (s *Service) save(userID string, st Settings, pending *Mode, from *platform.Date) (Row, error) {
 	row := Row{
-		DeviceID: deviceID, Mode: string(st.Mode), PendingFrom: from, Goal: string(st.Goal),
+		UserID: userID, Mode: string(st.Mode), PendingFrom: from, Goal: string(st.Goal),
 		HeightCm: st.HeightCm, WeightKg: st.WeightKg, LockMinutes: st.LockMinutes,
 		EmergencyPerWeek: st.EmergencyPerWeek, PhotoBackup: st.PhotoBackup,
 		CouponRest: st.Coupons.Rest, CouponCheat: st.Coupons.Cheat,
@@ -144,7 +144,12 @@ func (s *Service) save(deviceID string, st Settings, pending *Mode, from *platfo
 		GymName: deref(st.Gym.Name), GymAddress: deref(st.Gym.Address),
 		GymLat: st.Gym.Lat, GymLng: st.Gym.Lng, GymRadiusM: st.Gym.RadiusM,
 		SleepEnabled: st.Sleep.Enabled, BedTime: st.Sleep.BedTime, WakeTime: st.Sleep.WakeTime,
+		GymWeeklyTarget: st.Gym.WeeklyTarget, Nickname: st.Nickname, ThemeMode: st.ThemeMode,
+		Notifications: st.Notifications == nil || *st.Notifications, ShareFriends: st.ShareFriends,
 		UpdatedAt: s.clock.Now(),
+	}
+	if row.ThemeMode == "" {
+		row.ThemeMode = "system"
 	}
 	if pending != nil {
 		p := string(*pending)
@@ -152,14 +157,14 @@ func (s *Service) save(deviceID string, st Settings, pending *Mode, from *platfo
 	}
 	slots := make([]SlotRow, 0, len(st.Meals))
 	for _, m := range st.Meals {
-		slots = append(slots, SlotRow{DeviceID: deviceID, Idx: m.Index, Deadline: m.Deadline})
+		slots = append(slots, SlotRow{UserID: userID, Idx: m.Index, Deadline: m.Deadline})
 	}
 	days := []DayRow{}
 	seenDay := map[int]bool{}
 	for _, d := range st.Gym.Days {
 		if !seenDay[d] {
 			seenDay[d] = true
-			days = append(days, DayRow{DeviceID: deviceID, Weekday: d})
+			days = append(days, DayRow{UserID: userID, Weekday: d})
 		}
 	}
 	apps := []AppRow{}
@@ -167,33 +172,30 @@ func (s *Service) save(deviceID string, st Settings, pending *Mode, from *platfo
 	for _, a := range st.AllowedApps {
 		if !seenApp[a] && a != "" {
 			seenApp[a] = true
-			apps = append(apps, AppRow{DeviceID: deviceID, Package: a, Position: len(apps)})
+			apps = append(apps, AppRow{UserID: userID, Package: a, Position: len(apps)})
 		}
 	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := platform.EnsureDevice(tx, deviceID); err != nil {
-			return err
-		}
-		if err := tx.Omit("Device").Save(&row).Error; err != nil {
+		if err := tx.Omit("User").Save(&row).Error; err != nil {
 			return err
 		}
 		for _, m := range []any{&SlotRow{}, &DayRow{}, &AppRow{}} {
-			if err := tx.Where("device_id = ?", deviceID).Delete(m).Error; err != nil {
+			if err := tx.Where("user_id = ?", userID).Delete(m).Error; err != nil {
 				return err
 			}
 		}
 		if len(slots) > 0 {
-			if err := tx.Omit("Device").Create(&slots).Error; err != nil {
+			if err := tx.Omit("User").Create(&slots).Error; err != nil {
 				return err
 			}
 		}
 		if len(days) > 0 {
-			if err := tx.Omit("Device").Create(&days).Error; err != nil {
+			if err := tx.Omit("User").Create(&days).Error; err != nil {
 				return err
 			}
 		}
 		if len(apps) > 0 {
-			if err := tx.Omit("Device").Create(&apps).Error; err != nil {
+			if err := tx.Omit("User").Create(&apps).Error; err != nil {
 				return err
 			}
 		}
@@ -202,22 +204,22 @@ func (s *Service) save(deviceID string, st Settings, pending *Mode, from *platfo
 	return row, err
 }
 
-// load assembles the settings of a device from the normalized tables (gorm.ErrRecordNotFound if none).
-func (s *Service) load(deviceID string) (Settings, Row, error) {
+// load assembles the settings of a user from the normalized tables (gorm.ErrRecordNotFound if none).
+func (s *Service) load(userID string) (Settings, Row, error) {
 	var row Row
-	if err := s.db.First(&row, "device_id = ?", deviceID).Error; err != nil {
+	if err := s.db.First(&row, "user_id = ?", userID).Error; err != nil {
 		return Settings{}, row, err
 	}
 	var slots []SlotRow
 	var days []DayRow
 	var apps []AppRow
-	if err := s.db.Where("device_id = ?", deviceID).Order("idx").Find(&slots).Error; err != nil {
+	if err := s.db.Where("user_id = ?", userID).Order("idx").Find(&slots).Error; err != nil {
 		return Settings{}, row, err
 	}
-	if err := s.db.Where("device_id = ?", deviceID).Order("weekday").Find(&days).Error; err != nil {
+	if err := s.db.Where("user_id = ?", userID).Order("weekday").Find(&days).Error; err != nil {
 		return Settings{}, row, err
 	}
-	if err := s.db.Where("device_id = ?", deviceID).Order("position").Find(&apps).Error; err != nil {
+	if err := s.db.Where("user_id = ?", userID).Order("position").Find(&apps).Error; err != nil {
 		return Settings{}, row, err
 	}
 	st := Settings{
@@ -231,7 +233,10 @@ func (s *Service) load(deviceID string) (Settings, Row, error) {
 		Targets:     &Targets{Kcal: row.TargetKcal, Carbs: row.TargetCarbs, Protein: row.TargetProtein, Fat: row.TargetFat},
 		AllowedApps: make([]string, 0, len(apps)),
 		LockMinutes: row.LockMinutes, EmergencyPerWeek: row.EmergencyPerWeek, PhotoBackup: row.PhotoBackup,
+		Nickname: row.Nickname, ThemeMode: row.ThemeMode, Notifications: ptr(row.Notifications),
+		ShareFriends: row.ShareFriends,
 	}
+	st.Gym.WeeklyTarget = row.GymWeeklyTarget
 	for _, m := range slots {
 		st.Meals = append(st.Meals, MealSlot{Index: m.Idx, Deadline: m.Deadline})
 	}
@@ -239,6 +244,7 @@ func (s *Service) load(deviceID string) (Settings, Row, error) {
 		st.Gym.Days = append(st.Gym.Days, d.Weekday)
 	}
 	sort.Ints(st.Gym.Days)
+	st.Normalize()
 	for _, a := range apps {
 		st.AllowedApps = append(st.AllowedApps, a.Package)
 	}
@@ -253,7 +259,7 @@ func deref(s *string) string {
 }
 
 // Restore stores settings as given (used by the legacy-schema migration). Settings must be valid.
-func (s *Service) Restore(deviceID string, st Settings, pending *Mode, from *platform.Date) error {
-	_, err := s.save(deviceID, st, pending, from)
+func (s *Service) Restore(userID string, st Settings, pending *Mode, from *platform.Date) error {
+	_, err := s.save(userID, st, pending, from)
 	return err
 }

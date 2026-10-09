@@ -7,12 +7,12 @@ import (
 )
 
 func Register(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("GET /api/coupons", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("GET /api/coupons", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		date, err := platform.QueryDate(r, "date")
 		if err != nil {
 			return err
 		}
-		sum, err := svc.Summary(dev, date)
+		sum, err := svc.Summary(uid, date)
 		if err != nil {
 			return err
 		}
@@ -20,12 +20,12 @@ func Register(mux *http.ServeMux, svc *Service) {
 		return nil
 	}))
 	// Skip today's gym with a rest coupon.
-	mux.HandleFunc("POST /api/coupons/rest", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("POST /api/coupons/rest", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		date, err := platform.QueryDate(r, "date")
 		if err != nil {
 			return err
 		}
-		sum, err := svc.RestSummary(dev, date)
+		sum, err := svc.RestSummary(uid, date)
 		if err != nil {
 			return err
 		}

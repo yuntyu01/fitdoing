@@ -8,20 +8,20 @@ import (
 )
 
 func Register(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("GET /api/settings", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
-		v, err := svc.Get(dev)
+	mux.HandleFunc("GET /api/settings", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
+		v, err := svc.Get(uid)
 		if err != nil {
 			return err
 		}
 		platform.JSON(w, http.StatusOK, v)
 		return nil
 	}))
-	mux.HandleFunc("PUT /api/settings", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("PUT /api/settings", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		var in Settings
 		if err := platform.Decode(w, r, &in); err != nil {
 			return err
 		}
-		v, err := svc.Put(dev, in)
+		v, err := svc.Put(uid, in)
 		if err != nil {
 			return err
 		}
@@ -29,12 +29,12 @@ func Register(mux *http.ServeMux, svc *Service) {
 		return nil
 	}))
 	// Backup of the phone's settings as they are (the local copy is the truth).
-	mux.HandleFunc("PUT /api/sync/settings", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("PUT /api/sync/settings", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		var in Settings
 		if err := platform.Decode(w, r, &in); err != nil {
 			return err
 		}
-		v, err := svc.Backup(dev, in)
+		v, err := svc.Backup(uid, in)
 		if err != nil {
 			return err
 		}

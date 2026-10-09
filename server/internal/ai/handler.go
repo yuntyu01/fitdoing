@@ -18,7 +18,7 @@ const (
 // Register adds POST /api/meals/analyze. The app sends a downscaled photo (long side 1024px);
 // the result JSON is returned and the photo is dropped.
 func Register(mux *http.ServeMux, analyzer FoodAnalyzer) {
-	mux.HandleFunc("POST /api/meals/analyze", platform.Handle(func(w http.ResponseWriter, r *http.Request) error {
+	mux.HandleFunc("POST /api/meals/analyze", platform.WithUser(func(w http.ResponseWriter, r *http.Request, _ string) error { // costs money: login required
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequest)
 		// Parse fully in memory (limit == request cap) so nothing is spilled to a temp file.
 		err := r.ParseMultipartForm(maxRequest)

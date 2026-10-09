@@ -14,6 +14,8 @@ import (
 
 	"github.com/yuntyu01/fitdoing/server/internal/ai"
 	"github.com/yuntyu01/fitdoing/server/internal/api"
+	"github.com/yuntyu01/fitdoing/server/internal/auth"
+	"github.com/yuntyu01/fitdoing/server/internal/photo"
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 )
 
@@ -40,9 +42,21 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	authSvc := auth.NewService(db, cfg.AuthSecret, map[auth.Provider]auth.Verifier{
+		auth.Kakao:  &auth.KakaoVerifier{AppID: cfg.KakaoAppID, URL: cfg.KakaoInfoURL},
+		auth.Google: auth.NewGoogle(cfg.GoogleClientIDs),
+		auth.Apple:  auth.NewApple(cfg.AppleClientID),
+	}, nil)
+	if cfg.AuthDisabled {
+		slog.Warn("AUTH_DISABLED=1: 로그인 없이 모든 요청을 dev-user 로 처리해요 (개발 전용)")
+	}
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           api.New(db, analyzer, platform.Clock{Loc: cfg.Zone}, cfg.CORSOrigins),
+		Addr: ":" + cfg.Port,
+		Handler: api.New(db, analyzer, platform.Clock{Loc: cfg.Zone}, cfg.CORSOrigins, authSvc, api.Options{
+			AuthDisabled: cfg.AuthDisabled,
+			PhotoStore:   photoStore(cfg),
+			PublicURL:    cfg.PublicURL,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
@@ -56,6 +70,20 @@ func run() error {
 	slog.Info("listening", "addr", srv.Addr, "db", cfg.DBDriver, "ai", cfg.AIProvider)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
+	}
+	return nil
+}
+
+// photoStore picks where backed-up meal photos go (PHOTO_STORE). nil = photo backup off.
+func photoStore(cfg platform.Config) photo.Store {
+	switch cfg.PhotoStore {
+	case "file":
+		slog.Info("photo backup: local directory", "dir", cfg.PhotoDir)
+		return photo.FileStore{Dir: cfg.PhotoDir}
+	case "r2":
+		slog.Info("photo backup: Cloudflare R2", "bucket", cfg.R2Bucket)
+		return &photo.R2Store{Endpoint: cfg.R2Endpoint, Bucket: cfg.R2Bucket, AccessKey: cfg.R2AccessKey,
+			SecretKey: cfg.R2SecretKey, Region: "auto"}
 	}
 	return nil
 }

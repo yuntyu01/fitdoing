@@ -8,31 +8,31 @@ import (
 )
 
 func Register(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("POST /api/meals", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("POST /api/meals", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		var req Request
 		if err := platform.Decode(w, r, &req); err != nil {
 			return err
 		}
-		out, err := svc.Log(dev, req)
+		out, err := svc.Log(uid, req)
 		if err != nil {
 			return err
 		}
 		platform.JSON(w, http.StatusOK, out)
 		return nil
 	}))
-	mux.HandleFunc("GET /api/meals", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("GET /api/meals", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		date, err := platform.QueryDate(r, "date")
 		if err != nil {
 			return err
 		}
-		out, err := svc.ByDate(dev, date)
+		out, err := svc.ByDate(uid, date)
 		if err != nil {
 			return err
 		}
 		platform.JSON(w, http.StatusOK, out)
 		return nil
 	}))
-	mux.HandleFunc("DELETE /api/meals", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("DELETE /api/meals", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		date, err := platform.QueryDate(r, "date")
 		if err != nil {
 			return err
@@ -41,7 +41,7 @@ func Register(mux *http.ServeMux, svc *Service) {
 		if err != nil {
 			return platform.Invalid("index", "숫자여야 해요")
 		}
-		if err := svc.Delete(dev, date, idx); err != nil {
+		if err := svc.Delete(uid, date, idx); err != nil {
 			return err
 		}
 		w.WriteHeader(http.StatusNoContent)

@@ -12,6 +12,7 @@
   "gym": {
     "enabled": true,
     "days": [0, 2, 4, 5, 6],
+    "weeklyTarget": 4,
     "arriveBy": "19:00",
     "name": "바디핏짐 성수점",
     "address": "서울 성동구 연무장길 00",
@@ -25,5 +26,9 @@
   "allowedApps": ["com.kakao.talk"],
   "lockMinutes": 120,
   "emergencyPerWeek": 2,
-  "photoBackup": false
+  "photoBackup": false,
+  "nickname": "지훈",
+  "themeMode": "dark",
+  "notifications": true,
+  "shareFriends": true
 }

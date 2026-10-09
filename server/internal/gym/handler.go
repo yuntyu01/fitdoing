@@ -8,7 +8,7 @@ import (
 )
 
 func Register(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("POST /api/gym/check-in", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("POST /api/gym/check-in", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		var b struct {
 			Date       platform.Date `json:"date"`
 			VerifiedBy Verified      `json:"verifiedBy"`
@@ -26,7 +26,7 @@ func Register(mux *http.ServeMux, svc *Service) {
 		if b.VerifiedBy == Rest {
 			return platform.BadRequest("INVALID", "휴식은 /api/coupons/rest 로 처리해요")
 		}
-		g, err := svc.CheckIn(dev, b.Date, b.VerifiedBy, b.CheckInAt)
+		g, err := svc.CheckIn(uid, b.Date, b.VerifiedBy, b.CheckInAt)
 		if err != nil {
 			return err
 		}
@@ -37,7 +37,7 @@ func Register(mux *http.ServeMux, svc *Service) {
 		}{g.Date, g.VerifiedBy, g.CheckInAt})
 		return nil
 	}))
-	mux.HandleFunc("POST /api/sleep", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("POST /api/sleep", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		var b struct {
 			Date       platform.Date `json:"date"`
 			LockedAt   *time.Time    `json:"lockedAt"`
@@ -49,11 +49,11 @@ func Register(mux *http.ServeMux, svc *Service) {
 		if b.Date.IsZero() {
 			return platform.Invalid("date", "필수예요")
 		}
-		l, err := svc.Sleep(dev, b.Date, b.LockedAt, b.UnlockedAt)
+		l, err := svc.Sleep(uid, b.Date, b.LockedAt, b.UnlockedAt)
 		if err != nil {
 			return err
 		}
-		platform.JSON(w, http.StatusOK, l) // SleepLog hides deviceId
+		platform.JSON(w, http.StatusOK, l) // SleepLog hides userId
 		return nil
 	}))
 }

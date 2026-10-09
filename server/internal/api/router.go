@@ -2,22 +2,42 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/yuntyu01/fitdoing/server/internal/ai"
 	"github.com/yuntyu01/fitdoing/server/internal/appsync"
+	"github.com/yuntyu01/fitdoing/server/internal/auth"
 	"github.com/yuntyu01/fitdoing/server/internal/coupon"
+	"github.com/yuntyu01/fitdoing/server/internal/friends"
 	"github.com/yuntyu01/fitdoing/server/internal/gym"
 	"github.com/yuntyu01/fitdoing/server/internal/lock"
 	"github.com/yuntyu01/fitdoing/server/internal/meal"
+	"github.com/yuntyu01/fitdoing/server/internal/photo"
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 	"github.com/yuntyu01/fitdoing/server/internal/settings"
+	"github.com/yuntyu01/fitdoing/server/internal/share"
 	"github.com/yuntyu01/fitdoing/server/internal/stats"
 	"gorm.io/gorm"
 )
 
+// Options are the optional parts of the server.
+type Options struct {
+	AuthDisabled bool        // AUTH_DISABLED=1: every token is the dev user (development only)
+	PhotoStore   photo.Store // nil: photo backup answers 503 PHOTO_BACKUP_UNAVAILABLE
+	PublicURL    string      // PUBLIC_BASE_URL: base of the public share page links ("" = from the request)
+}
+
 // New builds the full HTTP handler (routes + CORS + request logging).
-func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigins []string) http.Handler {
+func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigins []string, authSvc *auth.Service, opts ...Options) http.Handler {
+	var o Options
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+	resolve := authSvc.Resolve
+	if o.AuthDisabled {
+		resolve = authSvc.DevResolve
+	}
 	// core builds the mutually dependent services on one DB handle, so a transaction can get its own set.
 	core := func(h *gorm.DB) (*settings.Service, *lock.Service, *gym.Service, *coupon.Service) {
 		st := settings.NewService(h, clock)
@@ -34,12 +54,20 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 	}, clock)
 	statsSvc := stats.NewService(db, settingsSvc, couponSvc, mealSvc)
 	syncSvc := appsync.NewService(db, func(h *gorm.DB) *settings.Service { st, _, _, _ := core(h); return st })
+	// Photo backup: a meal's photo goes with the meal, every photo with the account.
+	photoSvc := photo.NewService(db, o.PhotoStore)
+	mealSvc.OnDelete = func(uid string, d platform.Date, i int) error {
+		return photoSvc.Delete(context.Background(), uid, d, i)
+	}
+	authSvc.BeforeDelete = []func(string) error{func(uid string) error { return photoSvc.DeleteAll(context.Background(), uid) }}
+	syncSvc.Photos = photoSvc.Refs
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	settings.Register(mux, settingsSvc)
+	auth.Register(mux, authSvc)
 	ai.Register(mux, analyzer)
 	meal.Register(mux, mealSvc)
 	lock.Register(mux, lockSvc)
@@ -47,6 +75,9 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 	gym.Register(mux, gymSvc)
 	stats.Register(mux, statsSvc)
 	appsync.Register(mux, syncSvc)
+	photo.Register(mux, photoSvc)
+	friends.Register(mux, friends.NewService(db, photoSvc))
+	share.Register(mux, share.NewService(db, photoSvc, clock, o.PublicURL))
 
-	return platform.Logging(platform.CORS(corsOrigins)(mux))
+	return platform.Logging(platform.CORS(corsOrigins)(platform.Authenticate(resolve)(mux)))
 }

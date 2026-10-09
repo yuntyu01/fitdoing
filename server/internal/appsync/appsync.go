@@ -12,6 +12,7 @@ import (
 	"github.com/yuntyu01/fitdoing/server/internal/gym"
 	"github.com/yuntyu01/fitdoing/server/internal/lock"
 	"github.com/yuntyu01/fitdoing/server/internal/meal"
+	"github.com/yuntyu01/fitdoing/server/internal/photo"
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 	"github.com/yuntyu01/fitdoing/server/internal/settings"
 	"gorm.io/gorm"
@@ -38,6 +39,7 @@ type LockEventIn struct {
 	StartedAt  *Ms           `json:"startedAt"`
 	EndedAt    *Ms           `json:"endedAt"`
 	ReleasedBy *string       `json:"releasedBy"`
+	Reason     *string       `json:"reason"` // 비상 해제 사유 (선택, 100자 이하)
 }
 
 type CouponUseIn struct {
@@ -62,7 +64,7 @@ type Counts struct {
 	CouponUses int `json:"couponUses"`
 }
 
-// Snapshot is everything stored for a device, in the shape of the sync events.
+// Snapshot is everything stored for a user, in the shape of the sync events.
 type Snapshot struct {
 	Settings   *settings.Settings `json:"settings"`
 	Meals      []meal.View        `json:"meals"`
@@ -70,14 +72,19 @@ type Snapshot struct {
 	SleepLogs  []SleepLogIn       `json:"sleepLogs"`
 	LockEvents []LockEventIn      `json:"lockEvents"`
 	CouponUses []CouponUseIn      `json:"couponUses"`
+	Photos     []photo.Ref        `json:"photos"` // meals with a backed-up photo (GET /api/meals/photo)
 }
 
 type Service struct {
 	db       *gorm.DB
 	settings func(*gorm.DB) *settings.Service
+	// Photos lists backed-up meal photos for the snapshot (nil: none).
+	Photos func(userID string) ([]photo.Ref, error)
 }
 
-func NewService(db *gorm.DB, st func(*gorm.DB) *settings.Service) *Service { return &Service{db, st} }
+func NewService(db *gorm.DB, st func(*gorm.DB) *settings.Service) *Service {
+	return &Service{db: db, settings: st}
+}
 
 func ms(t time.Time) *Ms { v := t.UnixMilli(); return &v }
 
@@ -121,32 +128,29 @@ func needDate(field string, d platform.Date) error {
 
 // Push applies the events in one transaction. Items are validated as they are applied, so one bad
 // item rolls back the whole request.
-func (s *Service) Push(deviceID string, in Events) (Counts, error) {
+func (s *Service) Push(userID string, in Events) (Counts, error) {
 	var c Counts
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := platform.EnsureDevice(tx, deviceID); err != nil {
-			return err
-		}
 		for i, g := range in.GymLogs {
-			if err := upsertGym(tx, deviceID, g); err != nil {
+			if err := upsertGym(tx, userID, g); err != nil {
 				return err
 			}
 			c.GymLogs = i + 1
 		}
 		for i, l := range in.SleepLogs {
-			if err := upsertSleep(tx, deviceID, l); err != nil {
+			if err := upsertSleep(tx, userID, l); err != nil {
 				return err
 			}
 			c.SleepLogs = i + 1
 		}
 		for i, e := range in.LockEvents {
-			if err := upsertLock(tx, deviceID, e); err != nil {
+			if err := upsertLock(tx, userID, e); err != nil {
 				return err
 			}
 			c.LockEvents = i + 1
 		}
 		for i, u := range in.CouponUses {
-			if err := insertCoupon(tx, deviceID, u); err != nil {
+			if err := insertCoupon(tx, userID, u); err != nil {
 				return err
 			}
 			c.CouponUses = i + 1
@@ -159,7 +163,7 @@ func (s *Service) Push(deviceID string, in Events) (Counts, error) {
 	return c, nil
 }
 
-func upsertGym(tx *gorm.DB, dev string, in GymLogIn) error {
+func upsertGym(tx *gorm.DB, uid string, in GymLogIn) error {
 	if err := needDate("gymLogs.date", in.Date); err != nil {
 		return err
 	}
@@ -171,17 +175,17 @@ func upsertGym(tx *gorm.DB, dev string, in GymLogIn) error {
 		return err
 	}
 	var g gym.Log
-	err = tx.Where("device_id = ? AND gym_date = ?", dev, in.Date).First(&g).Error
+	err = tx.Where("user_id = ? AND gym_date = ?", uid, in.Date).First(&g).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		g = gym.Log{DeviceID: dev, Date: in.Date}
+		g = gym.Log{UserID: uid, Date: in.Date}
 	} else if err != nil {
 		return err
 	}
 	g.VerifiedBy, g.CheckInAt = gym.Verified(in.VerifiedBy), at
-	return tx.Omit("Device").Save(&g).Error
+	return tx.Omit("User").Save(&g).Error
 }
 
-func upsertSleep(tx *gorm.DB, dev string, in SleepLogIn) error {
+func upsertSleep(tx *gorm.DB, uid string, in SleepLogIn) error {
 	if err := needDate("sleepLogs.date", in.Date); err != nil {
 		return err
 	}
@@ -194,9 +198,9 @@ func upsertSleep(tx *gorm.DB, dev string, in SleepLogIn) error {
 		return err
 	}
 	var l gym.SleepLog
-	err = tx.Where("device_id = ? AND sleep_date = ?", dev, in.Date).First(&l).Error
+	err = tx.Where("user_id = ? AND sleep_date = ?", uid, in.Date).First(&l).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		l = gym.SleepLog{DeviceID: dev, Date: in.Date}
+		l = gym.SleepLog{UserID: uid, Date: in.Date}
 	} else if err != nil {
 		return err
 	}
@@ -206,10 +210,10 @@ func upsertSleep(tx *gorm.DB, dev string, in SleepLogIn) error {
 	if unlocked != nil {
 		l.UnlockedAt = unlocked
 	}
-	return tx.Omit("Device").Save(&l).Error
+	return tx.Omit("User").Save(&l).Error
 }
 
-func upsertLock(tx *gorm.DB, dev string, in LockEventIn) error {
+func upsertLock(tx *gorm.DB, uid string, in LockEventIn) error {
 	if err := oneOf("lockEvents.type", in.Type, "meal", "gym", "sleep"); err != nil {
 		return err
 	}
@@ -232,10 +236,13 @@ func upsertLock(tx *gorm.DB, dev string, in LockEventIn) error {
 		v := lock.ReleasedBy(*in.ReleasedBy)
 		by = &v
 	}
+	if in.Reason != nil && len([]rune(*in.Reason)) > 100 {
+		return platform.Invalid("lockEvents.reason", "100자 이하여야 해요")
+	}
 	var e lock.Event
-	err = tx.Where("device_id = ? AND type = ? AND started_at = ?", dev, in.Type, started).First(&e).Error
+	err = tx.Where("user_id = ? AND type = ? AND started_at = ?", uid, in.Type, started).First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		e = lock.Event{DeviceID: dev, Type: lock.Type(in.Type), Date: in.Date, StartedAt: started}
+		e = lock.Event{UserID: uid, Type: lock.Type(in.Type), Date: in.Date, StartedAt: started}
 	} else if err != nil {
 		return err
 	}
@@ -245,10 +252,13 @@ func upsertLock(tx *gorm.DB, dev string, in LockEventIn) error {
 	if by != nil {
 		e.ReleasedBy = by
 	}
-	return tx.Omit("Device").Save(&e).Error
+	if in.Reason != nil && *in.Reason != "" {
+		e.Reason = in.Reason
+	}
+	return tx.Omit("User").Save(&e).Error
 }
 
-func insertCoupon(tx *gorm.DB, dev string, in CouponUseIn) error {
+func insertCoupon(tx *gorm.DB, uid string, in CouponUseIn) error {
 	if err := oneOf("couponUses.type", in.Type, "rest", "cheat", "emergency"); err != nil {
 		return err
 	}
@@ -260,37 +270,45 @@ func insertCoupon(tx *gorm.DB, dev string, in CouponUseIn) error {
 		return err
 	}
 	var n int64
-	if err := tx.Model(&coupon.Use{}).Where("device_id = ? AND type = ? AND used_at = ?", dev, in.Type, used).Count(&n).Error; err != nil {
+	if err := tx.Model(&coupon.Use{}).Where("user_id = ? AND type = ? AND used_at = ?", uid, in.Type, used).Count(&n).Error; err != nil {
 		return err
 	}
 	if n > 0 {
 		return nil
 	}
-	u := coupon.Use{DeviceID: dev, Type: coupon.Type(in.Type), UsedAt: used, WeekKey: in.WeekKey}
-	return tx.Omit("Device").Create(&u).Error
+	u := coupon.Use{UserID: uid, Type: coupon.Type(in.Type), UsedAt: used, WeekKey: in.WeekKey}
+	return tx.Omit("User").Create(&u).Error
 }
 
-// Snapshot reads everything of a device in one transaction. settings is nil when none was ever stored.
-func (s *Service) Snapshot(deviceID string) (Snapshot, error) {
-	out := Snapshot{GymLogs: []GymLogIn{}, SleepLogs: []SleepLogIn{}, LockEvents: []LockEventIn{}, CouponUses: []CouponUseIn{}}
+// Snapshot reads everything of a user in one transaction. settings is nil when none was ever stored.
+func (s *Service) Snapshot(userID string) (Snapshot, error) {
+	out := Snapshot{GymLogs: []GymLogIn{}, SleepLogs: []SleepLogIn{}, LockEvents: []LockEventIn{}, CouponUses: []CouponUseIn{},
+		Photos: []photo.Ref{}}
+	if s.Photos != nil {
+		refs, err := s.Photos(userID)
+		if err != nil {
+			return out, err
+		}
+		out.Photos = refs
+	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		st := s.settings(tx)
-		ok, err := st.Exists(deviceID)
+		ok, err := st.Exists(userID)
 		if err != nil {
 			return err
 		}
 		if ok {
-			v, err := st.Get(deviceID)
+			v, err := st.Get(userID)
 			if err != nil {
 				return err
 			}
 			out.Settings = &v.Settings
 		}
-		if out.Meals, err = meal.ViewsAll(tx, deviceID); err != nil {
+		if out.Meals, err = meal.ViewsAll(tx, userID); err != nil {
 			return err
 		}
 		var gs []gym.Log
-		if err := tx.Where("device_id = ?", deviceID).Order("gym_date").Find(&gs).Error; err != nil {
+		if err := tx.Where("user_id = ?", userID).Order("gym_date").Find(&gs).Error; err != nil {
 			return err
 		}
 		for _, g := range gs {
@@ -301,7 +319,7 @@ func (s *Service) Snapshot(deviceID string) (Snapshot, error) {
 			out.GymLogs = append(out.GymLogs, in)
 		}
 		var ss []gym.SleepLog
-		if err := tx.Where("device_id = ?", deviceID).Order("sleep_date").Find(&ss).Error; err != nil {
+		if err := tx.Where("user_id = ?", userID).Order("sleep_date").Find(&ss).Error; err != nil {
 			return err
 		}
 		for _, l := range ss {
@@ -315,7 +333,7 @@ func (s *Service) Snapshot(deviceID string) (Snapshot, error) {
 			out.SleepLogs = append(out.SleepLogs, in)
 		}
 		var es []lock.Event
-		if err := tx.Where("device_id = ?", deviceID).Order("started_at").Find(&es).Error; err != nil {
+		if err := tx.Where("user_id = ?", userID).Order("started_at").Find(&es).Error; err != nil {
 			return err
 		}
 		for _, e := range es {
@@ -327,10 +345,11 @@ func (s *Service) Snapshot(deviceID string) (Snapshot, error) {
 				v := string(*e.ReleasedBy)
 				in.ReleasedBy = &v
 			}
+			in.Reason = e.Reason
 			out.LockEvents = append(out.LockEvents, in)
 		}
 		var us []coupon.Use
-		if err := tx.Where("device_id = ?", deviceID).Order("used_at, id").Find(&us).Error; err != nil {
+		if err := tx.Where("user_id = ?", userID).Order("used_at, id").Find(&us).Error; err != nil {
 			return err
 		}
 		for _, u := range us {
@@ -342,20 +361,20 @@ func (s *Service) Snapshot(deviceID string) (Snapshot, error) {
 }
 
 func Register(mux *http.ServeMux, svc *Service) {
-	mux.HandleFunc("POST /api/sync/events", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
+	mux.HandleFunc("POST /api/sync/events", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
 		var in Events
 		if err := platform.Decode(w, r, &in); err != nil {
 			return err
 		}
-		c, err := svc.Push(dev, in)
+		c, err := svc.Push(uid, in)
 		if err != nil {
 			return err
 		}
 		platform.JSON(w, http.StatusOK, c)
 		return nil
 	}))
-	mux.HandleFunc("GET /api/sync/snapshot", platform.WithDevice(func(w http.ResponseWriter, r *http.Request, dev string) error {
-		v, err := svc.Snapshot(dev)
+	mux.HandleFunc("GET /api/sync/snapshot", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
+		v, err := svc.Snapshot(uid)
 		if err != nil {
 			return err
 		}

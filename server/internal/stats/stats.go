@@ -12,11 +12,14 @@ import (
 	"math"
 )
 
-// Row is one line of the meal table. Unlogged rows carry the per-meal target instead of nutrition.
+// Row is one line of the meal table. A meal still to come carries its target instead of nutrition: what is left of
+// the day's targets, shared equally by the meals still to come. A missed meal (deadline passed, nothing logged) has
+// neither.
 type Row struct {
 	Index     int               `json:"index"`
 	Deadline  string            `json:"deadline"`
 	Logged    bool              `json:"logged"`
+	Missed    bool              `json:"missed"`
 	Nutrition *meal.Nutrition   `json:"nutrition"`
 	Target    *settings.Targets `json:"target"`
 }
@@ -24,7 +27,7 @@ type Row struct {
 type GymWeek struct {
 	Enabled        bool   `json:"enabled"`
 	Done           int    `json:"done"`
-	Planned        int    `json:"planned"`
+	Planned        int    `json:"planned"` // weekly target (gym.weeklyTarget, defaults to the number of gym days)
 	ScheduledToday bool   `json:"scheduledToday"`
 	ArriveBy       string `json:"arriveBy"`
 }
@@ -85,42 +88,54 @@ func NewService(db *gorm.DB, st *settings.Service, c *coupon.Service, m *meal.Se
 	return &Service{db, st, c, m}
 }
 
-func (s *Service) Today(deviceID string, date platform.Date) (Today, error) {
-	st, err := s.settings.Current(deviceID)
+// Today builds the home view of date. now is the device's local time "HH:mm" on that date ("" = unknown: no meal
+// counts as missed); meals whose deadline is at or before it and that have no log are missed.
+func (s *Service) Today(userID string, date platform.Date, now string) (Today, error) {
+	st, err := s.settings.Current(userID)
 	if err != nil {
 		return Today{}, err
 	}
 	var ms []meal.Log
-	if err := s.db.Where("device_id = ? AND meal_date = ?", deviceID, date).Find(&ms).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND meal_date = ?", userID, date).Find(&ms).Error; err != nil {
 		return Today{}, err
 	}
 	logged := map[int]meal.Log{}
 	for _, m := range ms {
 		logged[m.Index] = m
 	}
-	perMeal := st.Targets.PerMeal(len(st.Meals))
 	rows := []Row{}
 	total := meal.Nutrition{}
+	ahead := 0
 	for _, slot := range st.Meals {
 		m, ok := logged[slot.Index]
-		if !ok {
-			t := perMeal
-			rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline, Target: &t})
-			continue
+		switch {
+		case ok:
+			n := meal.NutritionOf(m)
+			total = total.Plus(n)
+			rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline, Logged: true, Nutrition: &n})
+		case now != "" && slot.Deadline <= now: // both "HH:mm"
+			rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline, Missed: true})
+		default:
+			ahead++
+			rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline})
 		}
-		n := meal.NutritionOf(m)
-		total = total.Plus(n)
-		rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline, Logged: true, Nutrition: &n})
 	}
-	streak, err := s.streak(deviceID, date)
+	left := remainingPerMeal(*st.Targets, total, ahead)
+	for i := range rows {
+		if !rows[i].Logged && !rows[i].Missed {
+			t := left
+			rows[i].Target = &t
+		}
+	}
+	streak, err := s.streak(userID, date)
 	if err != nil {
 		return Today{}, err
 	}
-	gymWeek, err := s.gymWeek(deviceID, st, date)
+	gymWeek, err := s.gymWeek(userID, st, date)
 	if err != nil {
 		return Today{}, err
 	}
-	sum, err := s.coupons.Summary(deviceID, date)
+	sum, err := s.coupons.Summary(userID, date)
 	if err != nil {
 		return Today{}, err
 	}
@@ -128,9 +143,9 @@ func (s *Service) Today(deviceID string, date platform.Date) (Today, error) {
 }
 
 // streak counts consecutive logged days; with nothing logged today it counts back from yesterday.
-func (s *Service) streak(deviceID string, date platform.Date) (int, error) {
+func (s *Service) streak(userID string, date platform.Date) (int, error) {
 	var days []platform.Date
-	err := s.db.Model(&meal.Log{}).Where("device_id = ? AND meal_date <= ?", deviceID, date).
+	err := s.db.Model(&meal.Log{}).Where("user_id = ? AND meal_date <= ?", userID, date).
 		Distinct().Order("meal_date DESC").Pluck("meal_date", &days).Error
 	if err != nil {
 		return 0, err
@@ -151,11 +166,11 @@ func (s *Service) streak(deviceID string, date platform.Date) (int, error) {
 	return n, nil
 }
 
-func (s *Service) gymWeek(deviceID string, st settings.Settings, date platform.Date) (GymWeek, error) {
+func (s *Service) gymWeek(userID string, st settings.Settings, date platform.Date) (GymWeek, error) {
 	mon := date.Monday()
 	var done int64
 	err := s.db.Model(&gym.Log{}).
-		Where("device_id = ? AND gym_date BETWEEN ? AND ? AND verified_by <> ?", deviceID, mon, mon.AddDays(6), gym.Rest).
+		Where("user_id = ? AND gym_date BETWEEN ? AND ? AND verified_by <> ?", userID, mon, mon.AddDays(6), gym.Rest).
 		Count(&done).Error // rest days do not count as visits
 	if err != nil {
 		return GymWeek{}, err
@@ -166,15 +181,15 @@ func (s *Service) gymWeek(deviceID string, st settings.Settings, date platform.D
 			scheduled = true
 		}
 	}
-	return GymWeek{st.Gym.Enabled, int(done), len(st.Gym.Days), scheduled, st.Gym.ArriveBy}, nil
+	return GymWeek{st.Gym.Enabled, int(done), st.Gym.WeeklyTarget, scheduled, st.Gym.ArriveBy}, nil
 }
 
-func (s *Service) Month(deviceID, month string) (Month, error) {
+func (s *Service) Month(userID, month string) (Month, error) {
 	from, to, err := platform.ParseMonth(month)
 	if err != nil {
 		return Month{}, platform.Invalid("month", "YYYY-MM 형식이어야 해요")
 	}
-	st, err := s.settings.Current(deviceID)
+	st, err := s.settings.Current(userID)
 	if err != nil {
 		return Month{}, err
 	}
@@ -183,7 +198,7 @@ func (s *Service) Month(deviceID, month string) (Month, error) {
 		N    int
 	}
 	if err := s.db.Model(&meal.Log{}).Select("meal_date AS date, COUNT(*) AS n").
-		Where("device_id = ? AND meal_date BETWEEN ? AND ?", deviceID, from, to).
+		Where("user_id = ? AND meal_date BETWEEN ? AND ?", userID, from, to).
 		Group("meal_date").Scan(&perDayRows).Error; err != nil {
 		return Month{}, err
 	}
@@ -193,7 +208,7 @@ func (s *Service) Month(deviceID, month string) (Month, error) {
 	}
 	set := func(model any, col string, extra string) (map[platform.Date]bool, error) {
 		var ds []platform.Date
-		q := s.db.Model(model).Where("device_id = ? AND "+col+" BETWEEN ? AND ?", deviceID, from, to)
+		q := s.db.Model(model).Where("user_id = ? AND "+col+" BETWEEN ? AND ?", userID, from, to)
 		if extra != "" {
 			q = q.Where(extra)
 		}
@@ -236,12 +251,12 @@ func (s *Service) Month(deviceID, month string) (Month, error) {
 	return Month{month, mealCount, MonthSummary{full, len(lockDays), len(gymDays)}, days}, nil
 }
 
-func (s *Service) Day(deviceID string, date platform.Date) (DayCard, error) {
-	st, err := s.settings.Current(deviceID)
+func (s *Service) Day(userID string, date platform.Date) (DayCard, error) {
+	st, err := s.settings.Current(userID)
 	if err != nil {
 		return DayCard{}, err
 	}
-	list, err := s.meals.ByDate(deviceID, date)
+	list, err := s.meals.ByDate(userID, date)
 	if err != nil {
 		return DayCard{}, err
 	}
@@ -250,11 +265,11 @@ func (s *Service) Day(deviceID string, date platform.Date) (DayCard, error) {
 		total = total.Plus(m.Nutrition)
 	}
 	var g []gym.Log
-	if err := s.db.Where("device_id = ? AND gym_date = ?", deviceID, date).Limit(1).Find(&g).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND gym_date = ?", userID, date).Limit(1).Find(&g).Error; err != nil {
 		return DayCard{}, err
 	}
 	var locks int64
-	if err := s.db.Model(&lock.Event{}).Where("device_id = ? AND lock_date = ?", deviceID, date).Count(&locks).Error; err != nil {
+	if err := s.db.Model(&lock.Event{}).Where("user_id = ? AND lock_date = ?", userID, date).Count(&locks).Error; err != nil {
 		return DayCard{}, err
 	}
 	card := DayCard{Date: date, Total: total, Targets: *st.Targets, Meals: list, Locked: locks > 0, LockCount: int(locks)}
@@ -284,6 +299,50 @@ type Weekly struct {
 	LastAvg   *meal.Nutrition  `json:"lastAvg"` // last week, logged days
 	Targets   settings.Targets `json:"targets"`
 	BandPct   int              `json:"bandPct"` // goal range, +-10%
+	// Summary per metric (kcal, carbs, protein, fat): the line under the graph. Same as the app's weeklySummary.
+	Summary map[string]WeekSummary `json:"summary"`
+}
+
+// WeekSummary: done past days (today excluded), how many were within the goal range, and the done day furthest
+// outside it (diff = value - target, negative when short), null when every done day was within.
+type WeekSummary struct {
+	Completed int       `json:"completed"`
+	Achieved  int       `json:"achieved"`
+	Furthest  *Furthest `json:"furthest"`
+}
+
+type Furthest struct {
+	Index int `json:"index"` // 0 = Monday
+	Diff  int `json:"diff"`
+}
+
+func weekSummary(days []WeekDay, target int, pick func(meal.Nutrition) int) WeekSummary {
+	lo := float64(target) * (1 - weeklyBandPct/100.0)
+	hi := float64(target) * (1 + weeklyBandPct/100.0)
+	out := WeekSummary{}
+	for _, d := range days {
+		if d.State != "done" || d.Current == nil {
+			continue
+		}
+		out.Completed++
+		v := pick(*d.Current)
+		if float64(v) >= lo && float64(v) <= hi {
+			out.Achieved++
+			continue
+		}
+		diff := v - target
+		if out.Furthest == nil || abs(diff) > abs(out.Furthest.Diff) {
+			out.Furthest = &Furthest{Index: d.Index, Diff: diff}
+		}
+	}
+	return out
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 const weeklyBandPct = 10
@@ -301,14 +360,14 @@ func meanNutrition(ns []meal.Nutrition) *meal.Nutrition {
 	return &meal.Nutrition{Kcal: avg(t.Kcal), Carbs: avg(t.Carbs), Protein: avg(t.Protein), Fat: avg(t.Fat)}
 }
 
-func (s *Service) Weekly(deviceID string, date platform.Date) (Weekly, error) {
-	st, err := s.settings.Current(deviceID)
+func (s *Service) Weekly(userID string, date platform.Date) (Weekly, error) {
+	st, err := s.settings.Current(userID)
 	if err != nil {
 		return Weekly{}, err
 	}
 	mon := date.Monday()
 	var ms []meal.Log
-	if err := s.db.Where("device_id = ? AND meal_date BETWEEN ? AND ?", deviceID, mon.AddDays(-7), mon.AddDays(6)).
+	if err := s.db.Where("user_id = ? AND meal_date BETWEEN ? AND ?", userID, mon.AddDays(-7), mon.AddDays(6)).
 		Find(&ms).Error; err != nil {
 		return Weekly{}, err
 	}
@@ -349,5 +408,23 @@ func (s *Service) Weekly(deviceID string, date platform.Date) (Weekly, error) {
 		}
 		days = append(days, wd)
 	}
-	return Weekly{mon, days, meanNutrition(thisDone), meanNutrition(lastAll), *st.Targets, weeklyBandPct}, nil
+	t := *st.Targets
+	summary := map[string]WeekSummary{
+		"kcal":    weekSummary(days, t.Kcal, func(n meal.Nutrition) int { return n.Kcal }),
+		"carbs":   weekSummary(days, t.Carbs, func(n meal.Nutrition) int { return n.Carbs }),
+		"protein": weekSummary(days, t.Protein, func(n meal.Nutrition) int { return n.Protein }),
+		"fat":     weekSummary(days, t.Fat, func(n meal.Nutrition) int { return n.Fat }),
+	}
+	return Weekly{mon, days, meanNutrition(thisDone), meanNutrition(lastAll), t, weeklyBandPct, summary}, nil
+}
+
+// remainingPerMeal is what is left of the day's targets after eaten, shared equally by n meals (0 once exceeded).
+// Same calculation as the app's remainingPerMeal (domain/targets.ts).
+func remainingPerMeal(t settings.Targets, eaten meal.Nutrition, n int) settings.Targets {
+	d := float64(max(1, n))
+	f := func(target, got int) int { return max(0, int(math.Floor(float64(target-got)/d+0.5))) }
+	return settings.Targets{
+		Kcal: f(t.Kcal, eaten.Kcal), Carbs: f(t.Carbs, eaten.Carbs),
+		Protein: f(t.Protein, eaten.Protein), Fat: f(t.Fat, eaten.Fat),
+	}
 }

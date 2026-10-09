@@ -29,3 +29,6 @@ modules/**/android/.cxx/
 
 # 개발용 서버 DB
 server/dev.db
+
+# 서버 개발용 사진 백업 폴더(PHOTO_STORE=file)
+server/photos/

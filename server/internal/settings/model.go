@@ -1,9 +1,10 @@
-// Package settings holds the per-device settings backup, goals and targets.
+// Package settings holds the per-user settings backup, goals and targets.
 package settings
 
 import (
 	"math"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
@@ -77,14 +78,16 @@ type MealSlot struct {
 }
 
 type Gym struct {
-	Enabled  bool     `json:"enabled"`
-	Days     []int    `json:"days"` // 0=Mon ... 6=Sun
-	ArriveBy string   `json:"arriveBy"`
-	Name     *string  `json:"name"`
-	Address  *string  `json:"address"`
-	Lat      *float64 `json:"lat"`
-	Lng      *float64 `json:"lng"`
-	RadiusM  int      `json:"radiusM"`
+	Enabled bool  `json:"enabled"`
+	Days    []int `json:"days"` // 0=Mon ... 6=Sun
+	// WeeklyTarget is how many check-ins a week count as done (1~7). 0 or absent = the number of gym days.
+	WeeklyTarget int      `json:"weeklyTarget"`
+	ArriveBy     string   `json:"arriveBy"`
+	Name         *string  `json:"name"`
+	Address      *string  `json:"address"`
+	Lat          *float64 `json:"lat"`
+	Lng          *float64 `json:"lng"`
+	RadiusM      int      `json:"radiusM"`
 }
 
 type Sleep struct {
@@ -113,6 +116,27 @@ type Settings struct {
 	LockMinutes      int        `json:"lockMinutes"`
 	EmergencyPerWeek int        `json:"emergencyPerWeek"`
 	PhotoBackup      bool       `json:"photoBackup"`
+	// Added 2026-10: absent in older apps, so each has a default (see Normalize).
+	Nickname      string `json:"nickname"`      // shown to friends, up to 20 characters
+	ThemeMode     string `json:"themeMode"`     // system | light | dark
+	Notifications *bool  `json:"notifications"` // deadline reminders on/off (absent = on)
+	ShareFriends  bool   `json:"shareFriends"`  // new meals are shared with friends by default
+}
+
+// ThemeModes are the allowed themeMode values.
+var ThemeModes = []string{"system", "light", "dark"}
+
+// Normalize fills the defaults of the fields older apps don't send.
+func (s *Settings) Normalize() {
+	if s.ThemeMode == "" {
+		s.ThemeMode = "system"
+	}
+	if s.Notifications == nil {
+		s.Notifications = ptr(true)
+	}
+	if s.Gym != nil && s.Gym.WeeklyTarget == 0 {
+		s.Gym.WeeklyTarget = len(s.Gym.Days)
+	}
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -127,6 +151,7 @@ func Defaults() Settings {
 		Sleep:   &Sleep{Enabled: true, BedTime: "23:30", WakeTime: "07:00"},
 		Coupons: &Coupons{Rest: 2, Cheat: 2}, Targets: &t,
 		AllowedApps: []string{}, LockMinutes: 120, EmergencyPerWeek: 2,
+		ThemeMode: "system", Notifications: ptr(true),
 	}
 }
 
@@ -164,6 +189,10 @@ func (s *Settings) Validate() error {
 		return platform.Invalid("lockMinutes", "10~720 사이여야 해요")
 	case !between(s.EmergencyPerWeek, 0, 7):
 		return platform.Invalid("emergencyPerWeek", "0~7 사이여야 해요")
+	case len([]rune(s.Nickname)) > 20:
+		return platform.Invalid("nickname", "20자 이하여야 해요")
+	case s.ThemeMode != "" && !slices.Contains(ThemeModes, s.ThemeMode):
+		return platform.Invalid("themeMode", "system, light, dark 중 하나예요")
 	}
 	for _, m := range s.Meals {
 		if !between(m.Index, 1, 6) {
@@ -181,6 +210,9 @@ func (s *Settings) Validate() error {
 		if !between(d, 0, 6) {
 			return platform.Invalid("gym.days", "0~6 사이여야 해요")
 		}
+	}
+	if !between(g.WeeklyTarget, 0, 7) {
+		return platform.Invalid("gym.weeklyTarget", "0~7 사이여야 해요")
 	}
 	switch {
 	case !ValidHHMM(g.ArriveBy):
@@ -215,9 +247,9 @@ type View struct {
 }
 
 // Row is the scalar part of the settings (table user_settings). Meal slots, gym weekdays and allowed
-// apps live in their own tables (SlotRow, DayRow, AppRow); everything cascades from devices.
+// apps live in their own tables (SlotRow, DayRow, AppRow); everything cascades from users.
 type Row struct {
-	DeviceID         string         `gorm:"column:device_id;primaryKey;size:64"`
+	UserID           string         `gorm:"column:user_id;primaryKey;size:64"`
 	Mode             string         `gorm:"column:mode;size:8;not null;check:ck_user_settings_mode,mode IN ('mild','normal','spicy')"`
 	PendingMode      *string        `gorm:"column:pending_mode;size:8;check:ck_user_settings_pending,pending_mode IN ('mild','normal','spicy')"`
 	PendingFrom      *platform.Date `gorm:"column:pending_from;size:10"`
@@ -243,41 +275,46 @@ type Row struct {
 	SleepEnabled     bool           `gorm:"column:sleep_enabled;not null"`
 	BedTime          string         `gorm:"column:bed_time;size:5;not null"`
 	WakeTime         string         `gorm:"column:wake_time;size:5;not null"`
+	GymWeeklyTarget  int            `gorm:"column:gym_weekly_target;not null;default:0"`
+	Nickname         string         `gorm:"column:nickname;size:80;not null;default:''"`
+	ThemeMode        string         `gorm:"column:theme_mode;size:8;not null;default:'system'"`
+	Notifications    bool           `gorm:"column:notifications;not null;default:true"`
+	ShareFriends     bool           `gorm:"column:share_friends;not null;default:false"`
 	UpdatedAt        time.Time      `gorm:"column:updated_at;not null"`
 
-	Device *platform.Device `gorm:"foreignKey:DeviceID;references:DeviceKey;constraint:OnDelete:CASCADE"`
+	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 }
 
 func (Row) TableName() string { return "user_settings" }
 
 // SlotRow is one meal deadline of the settings (table meal_slots).
 type SlotRow struct {
-	DeviceID string `gorm:"column:device_id;primaryKey;size:64"`
+	UserID   string `gorm:"column:user_id;primaryKey;size:64"`
 	Idx      int    `gorm:"column:idx;primaryKey;autoIncrement:false;check:ck_meal_slots_idx,idx BETWEEN 1 AND 6"`
 	Deadline string `gorm:"column:deadline;size:5;not null"`
 
-	Device *platform.Device `gorm:"foreignKey:DeviceID;references:DeviceKey;constraint:OnDelete:CASCADE"`
+	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 }
 
 func (SlotRow) TableName() string { return "meal_slots" }
 
 // DayRow is one gym weekday, 0=Mon ... 6=Sun (table gym_days).
 type DayRow struct {
-	DeviceID string `gorm:"column:device_id;primaryKey;size:64"`
-	Weekday  int    `gorm:"column:weekday;primaryKey;autoIncrement:false;check:ck_gym_days_weekday,weekday BETWEEN 0 AND 6"`
+	UserID  string `gorm:"column:user_id;primaryKey;size:64"`
+	Weekday int    `gorm:"column:weekday;primaryKey;autoIncrement:false;check:ck_gym_days_weekday,weekday BETWEEN 0 AND 6"`
 
-	Device *platform.Device `gorm:"foreignKey:DeviceID;references:DeviceKey;constraint:OnDelete:CASCADE"`
+	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 }
 
 func (DayRow) TableName() string { return "gym_days" }
 
 // AppRow is one app allowed while locked (table allowed_apps). Position keeps the app's order.
 type AppRow struct {
-	DeviceID string `gorm:"column:device_id;primaryKey;size:64"`
+	UserID   string `gorm:"column:user_id;primaryKey;size:64"`
 	Package  string `gorm:"column:package;primaryKey;size:255"`
 	Position int    `gorm:"column:position;not null"`
 
-	Device *platform.Device `gorm:"foreignKey:DeviceID;references:DeviceKey;constraint:OnDelete:CASCADE"`
+	User *platform.User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 }
 
 func (AppRow) TableName() string { return "allowed_apps" }

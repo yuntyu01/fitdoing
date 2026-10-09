@@ -17,7 +17,7 @@ func TestGeminiSendsInlineImageAndParsesSchema(t *testing.T) {
 		gotKey, gotPath = r.Header.Get("x-goog-api-key"), r.URL.Path
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
-		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"items\":[{\"name\":\"밥\",\"amount\":\"1공기\"}],\"kcal\":300,\"carbs\":60,\"protein\":6,\"fat\":1,\"confidence\":0.7}"}]}}]}`))
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"items\":[{\"name\":\"밥\",\"amount\":\"1공기\",\"kcal\":300,\"carbs\":60,\"protein\":6,\"fat\":1},{\"name\":\"김\",\"amount\":\"1장\",\"kcal\":10,\"carbs\":1,\"protein\":1,\"fat\":1}],\"confidence\":0.7}"}]}}]}`))
 	}))
 	defer srv.Close()
 	g, err := NewGemini("secret", "gemini-2.5-flash", srv.Client())
@@ -28,7 +28,8 @@ func TestGeminiSendsInlineImageAndParsesSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Kcal != 300 || res.Items[0].Name != "밥" {
+	// totals are the sum of the foods; each food keeps its own numbers
+	if res.Kcal != 310 || res.Carbs != 61 || res.Items[0].Name != "밥" || *res.Items[0].Kcal != 300 || *res.Items[1].Fat != 1 {
 		t.Fatalf("got %+v", res)
 	}
 	if gotKey != "secret" || gotPath != "/models/gemini-2.5-flash:generateContent" {
@@ -54,5 +55,39 @@ func TestGeminiFailureIsBadGateway(t *testing.T) {
 func TestGeminiNeedsKey(t *testing.T) {
 	if _, err := NewGemini("", "m", nil); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestGeminiResultIsValidated(t *testing.T) {
+	cases := map[string]string{
+		"missing confidence": `{"items":[]}`,
+		"food without kcal":  `{"items":[{"name":"밥","amount":"1공기","carbs":60,"protein":6,"fat":1}],"confidence":0.5}`,
+		"negative kcal":      `{"items":[{"name":"밥","amount":"1공기","kcal":-5,"carbs":0,"protein":0,"fat":0}],"confidence":0.5}`,
+		"confidence > 1":     `{"items":[],"confidence":95}`,
+		"empty item name":    `{"items":[{"name":" ","amount":"1개","kcal":100,"carbs":0,"protein":0,"fat":0}],"confidence":0.5}`,
+		"fractional kcal":    `{"items":[{"name":"밥","amount":"1공기","kcal":100.5,"carbs":0,"protein":0,"fat":0}],"confidence":0.5}`,
+		"carbs over 1000":    `{"items":[{"name":"밥","amount":"1공기","kcal":100,"carbs":5000,"protein":0,"fat":0}],"confidence":0.5}`,
+		"not json":           `밥 한 공기 300kcal`,
+	}
+	for name, text := range cases {
+		if _, err := parseResult(text); err == nil {
+			t.Errorf("%s: accepted %s", name, text)
+		}
+	}
+	r, err := parseResult(`{"items":null,"confidence":0}`)
+	if err != nil || r.Items == nil || r.Kcal != 0 {
+		t.Fatalf("not-food answer: %+v %v", r, err)
+	}
+}
+
+func TestMockTotalsAreTheSumOfItems(t *testing.T) {
+	for _, s := range samples {
+		var k, c, p, f int
+		for _, it := range s.Items {
+			k, c, p, f = k+*it.Kcal, c+*it.Carbs, p+*it.Protein, f+*it.Fat
+		}
+		if k != s.Kcal || c != s.Carbs || p != s.Protein || f != s.Fat {
+			t.Errorf("%v: items sum %d/%d/%d/%d", s.Items[0].Name, k, c, p, f)
+		}
 	}
 }
