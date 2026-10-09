@@ -2,6 +2,8 @@ package platform
 
 import (
 	"fmt"
+	"net"
+	neturl "net/url"
 	"strings"
 	"time"
 )
@@ -38,6 +40,7 @@ const defaultPostgresDSN = "host=localhost user=fitdoing password=fitdoing dbnam
 // LoadConfig builds a Config from getenv (os.Getenv in production).
 //
 //	DB_URL     Postgres DSN (default: local fitdoing DB). "sqlite::memory:" or "sqlite:./dev.db" selects SQLite.
+//	           Without it: DATABASE_URL, then DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD (DB_SSLMODE, default disable).
 //	DB_DRIVER  postgres | sqlite (optional; inferred from DB_URL)
 //	AUTH_SECRET        login token signing key, 32+ chars (SQLite dev has a built-in default)
 //	GOOGLE_CLIENT_IDS  comma separated web client ids of the Google sign-in
@@ -94,7 +97,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		}
 	}
 
-	url := strings.TrimSpace(getenv("DB_URL"))
+	url := firstNonEmpty(getenv("DB_URL"), getenv("DATABASE_URL"), hostDSN(getenv))
 	c.DBDriver = strings.ToLower(strings.TrimSpace(getenv("DB_DRIVER")))
 	if strings.HasPrefix(url, "sqlite:") {
 		c.DBDriver = "sqlite"
@@ -125,4 +128,31 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return c, fmt.Errorf("AUTH_SECRET은 32자 이상이어야 해요 (예: openssl rand -hex 32)")
 	}
 	return c, nil
+}
+
+func firstNonEmpty(vs ...string) string {
+	for _, v := range vs {
+		if v = strings.TrimSpace(v); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// hostDSN builds a Postgres URL from DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD (what hosts such as KoDeploy
+// inject for an attached database). "" when DB_HOST is unset. DB_SSLMODE defaults to disable.
+func hostDSN(getenv func(string) string) string {
+	host := strings.TrimSpace(getenv("DB_HOST"))
+	if host == "" {
+		return ""
+	}
+	port := firstNonEmpty(getenv("DB_PORT"), "5432")
+	u := neturl.URL{
+		Scheme:   "postgres",
+		User:     neturl.UserPassword(strings.TrimSpace(getenv("DB_USER")), getenv("DB_PASSWORD")),
+		Host:     net.JoinHostPort(host, port),
+		Path:     "/" + strings.TrimSpace(getenv("DB_NAME")),
+		RawQuery: "sslmode=" + neturl.QueryEscape(firstNonEmpty(getenv("DB_SSLMODE"), "disable")),
+	}
+	return u.String()
 }

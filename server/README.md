@@ -38,6 +38,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 |---|---|---|
 | `PORT` | `8080` | 리슨 포트 |
 | `DB_URL` | 로컬 Postgres | Postgres DSN(`postgres://…`도 가능). `sqlite:` 접두사면 SQLite(`sqlite::memory:`, `sqlite:./dev.db`) |
+| `DATABASE_URL`, `DB_HOST`·`DB_PORT`·`DB_NAME`·`DB_USER`·`DB_PASSWORD`·`DB_SSLMODE` | — | `DB_URL`이 없을 때 차례로 사용 (호스팅이 주입하는 DB 정보, `DB_SSLMODE` 기본 `disable`) |
 | `DB_DRIVER` | 자동 | `postgres` \| `sqlite` (`DB_URL`로 추론, 둘 다 없으면 postgres) |
 | `AI_PROVIDER` | `mock` | `mock` \| `gemini` |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `gemini-2.5-flash`는 이제 404 |
