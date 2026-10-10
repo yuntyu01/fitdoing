@@ -41,7 +41,7 @@ func TestDatabaseFromHostInjectedVariables(t *testing.T) {
 	}
 }
 
-func TestAIModelsAndAdminToken(t *testing.T) {
+func TestAIModelsAndAdminPassword(t *testing.T) {
 	base := map[string]string{"AUTH_SECRET": "0123456789abcdef0123456789abcdef", "DB_URL": "sqlite::memory:"}
 	with := func(kv ...string) map[string]string {
 		m := map[string]string{}
@@ -67,14 +67,14 @@ func TestAIModelsAndAdminToken(t *testing.T) {
 	if want := "[gemini-3.5-flash-lite gemini-3.9-pro]"; cfg.GeminiModel != "gemini-3.8-flash" || fmt.Sprint(cfg.GeminiExtra) != want {
 		t.Fatalf("models: %q + %v", cfg.GeminiModel, cfg.GeminiExtra)
 	}
-	if cfg.AdminToken != "" {
-		t.Fatal("admin API must be off by default")
+	if cfg.AdminPassword != "" {
+		t.Fatal("admin page must be off by default")
 	}
-	if _, err := LoadConfig(envOf(with("ADMIN_TOKEN", "short"))); err == nil {
-		t.Fatal("short ADMIN_TOKEN accepted")
+	if _, err := LoadConfig(envOf(with("ADMIN_PASSWORD", "짧은비번"))); err == nil {
+		t.Fatal("short ADMIN_PASSWORD accepted")
 	}
-	cfg, err = LoadConfig(envOf(with("ADMIN_TOKEN", "0123456789abcdef0123456789abcdef")))
-	if err != nil || cfg.AdminToken == "" {
-		t.Fatalf("admin token: %v", err)
+	cfg, err = LoadConfig(envOf(with("ADMIN_PASSWORD", "운동하는-관리자-2026")))
+	if err != nil || cfg.AdminPassword != "운동하는-관리자-2026" {
+		t.Fatalf("admin password: %v", err)
 	}
 }

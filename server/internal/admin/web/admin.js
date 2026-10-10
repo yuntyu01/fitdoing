@@ -1,16 +1,9 @@
-// 관리자 페이지: 토큰은 sessionStorage(이 탭)에만 둔다. 모든 데이터는 /api/admin/* 에서 X-Admin-Token 으로 받는다.
+// 관리자 페이지: 비밀번호로 로그인하면 서버가 30일짜리 쿠키(HttpOnly)를 준다. 페이지는 비밀번호를 저장하지 않는다.
 (function () {
   const $ = (id) => document.getElementById(id);
-  const KEY = 'fitdoing-admin-token';
   const PAGE = 50;
-  let token = '';
   let offset = 0;
   let catalog = null;
-
-  const store = {
-    get() { try { return sessionStorage.getItem(KEY) || ''; } catch { return ''; } },
-    set(v) { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch {} },
-  };
 
   function status(msg, err) {
     $('status').textContent = msg;
@@ -20,13 +13,14 @@
   async function api(method, path, body) {
     const res = await fetch(path, {
       method,
-      headers: Object.assign({ 'X-Admin-Token': token }, body ? { 'Content-Type': 'application/json' } : {}),
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      credentials: 'same-origin',
       body: body ? JSON.stringify(body) : undefined,
       cache: 'no-store',
     });
-    const data = await res.json().catch(() => ({}));
+    const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
     if (!res.ok) {
-      const e = new Error(res.status === 401 ? '토큰이 맞지 않아요' : data.message || '요청이 실패했어요 (' + res.status + ')');
+      const e = new Error(data.message || '요청이 실패했어요 (' + res.status + ')');
       e.status = res.status;
       throw e;
     }
@@ -102,6 +96,15 @@
     }
   }
 
+  function showLogin(msg, err) {
+    catalog = null;
+    $('users').textContent = '';
+    $('panel').hidden = true;
+    $('login').hidden = false;
+    status(msg || '', err);
+    $('password').focus();
+  }
+
   async function load(reset) {
     if (reset) {
       offset = 0;
@@ -115,33 +118,39 @@
       offset += data.users.length;
       $('more').hidden = data.users.length < PAGE;
       $('models').textContent = '기본 모델: ' + catalog.default + ' · 지정 가능: ' + catalog.allowed.join(', ');
+      $('login').hidden = true;
       $('panel').hidden = false;
       status(offset ? '사용자 ' + offset + '명' : '아직 사용자가 없어요');
-      store.set(token);
     } catch (e) {
-      catalog = null;
-      $('panel').hidden = true;
-      if (e.status === 401) store.set('');
-      status(e.message, true);
+      if (e.status === 401) showLogin('다시 로그인해 주세요', true);
+      else status(e.message, true);
     }
   }
 
-  $('login').addEventListener('submit', (ev) => {
+  $('login').addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    token = $('token').value.trim();
-    $('token').value = '';
-    if (token) load(true);
+    const password = $('password').value;
+    if (!password) return;
+    const btn = ev.submitter;
+    if (btn) btn.disabled = true;
+    try {
+      await api('POST', '/api/admin/login', { password });
+      $('password').value = '';
+      await load(true);
+    } catch (e) {
+      status(e.message, true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
   $('more').addEventListener('click', () => load(false));
-  $('logout').addEventListener('click', () => {
-    token = '';
-    catalog = null;
-    store.set('');
-    $('users').textContent = '';
-    $('panel').hidden = true;
-    status('토큰을 지웠어요');
+  $('logout').addEventListener('click', async () => {
+    try {
+      await api('POST', '/api/admin/logout');
+    } catch {}
+    showLogin('로그아웃했어요');
   });
 
-  token = store.get();
-  if (token) load(true);
+  // 이미 로그인돼 있으면(쿠키) 바로 목록을 연다
+  api('GET', '/api/admin/session').then(() => load(true), () => showLogin());
 })();

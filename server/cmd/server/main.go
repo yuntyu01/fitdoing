@@ -64,11 +64,11 @@ func run() error {
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: api.New(db, analyzer, platform.Clock{Loc: cfg.Zone}, cfg.CORSOrigins, authSvc, api.Options{
-			AuthDisabled: cfg.AuthDisabled,
-			AIModels:     models,
-			AdminToken:   cfg.AdminToken,
-			PhotoStore:   photoStore(cfg),
-			PublicURL:    cfg.PublicURL,
+			AuthDisabled:  cfg.AuthDisabled,
+			AIModels:      models,
+			AdminPassword: cfg.AdminPassword,
+			PhotoStore:    photoStore(cfg),
+			PublicURL:     cfg.PublicURL,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -81,7 +81,7 @@ func run() error {
 		_ = srv.Shutdown(ctx)
 	}()
 	slog.Info("listening", "addr", srv.Addr, "db", cfg.DBDriver, "ai", cfg.AIProvider, "models", names,
-		"admin", cfg.AdminToken != "")
+		"admin", cfg.AdminPassword != "")
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

@@ -43,7 +43,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `AI_PROVIDER` | `mock` | `mock` \| `gemini` |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `GEMINI_MODEL`은 모든 사용자의 기본 모델. `gemini-2.5-flash`는 이제 404 |
 | `GEMINI_MODELS` | - | (선택) 관리자가 지정할 수 있는 모델을 더할 때만. 기본으로 `gemini-3.5-flash-lite`·`gemini-3.8-flash`는 설정 없이 지정할 수 있다(`platform.BuiltinGeminiModels`) |
-| `ADMIN_TOKEN` | - | 32자 이상이면 관리자 API(`/api/admin/*`, 헤더 `X-Admin-Token`)를 켠다. 비우면 관리자 API는 404 |
+| `ADMIN_PASSWORD` | - | 10자 이상이면 관리자 페이지 `/admin`과 API를 켠다. 비우면 둘 다 404. 바꾸면 기존 관리자 로그인이 모두 풀린다 |
 | `ZONE` | `Asia/Seoul` | 서버 기준 시간대(강도 변경 적용일 등) |
 | `CORS_ORIGINS` | `*` | 쉼표로 구분한 허용 출처. 웹 미리보기용 |
 | `AUTH_SECRET` | SQLite일 때만 개발용 기본값 | 로그인 토큰 서명 키, **32자 이상** (`openssl rand -hex 32`). Postgres에서 비어 있으면 서버가 시작하지 않는다 |
@@ -68,19 +68,21 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 - 사진 5MB 초과 413 `PHOTO_TOO_LARGE`, 이미지가 아니면 400 `INVALID_PHOTO`.
 - 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + 기본 목록(`gemini-3.5-flash-lite`, `gemini-3.8-flash`) + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
 
-## 관리자 API (`X-Admin-Token: <ADMIN_TOKEN>`, 사용자 로그인과 별개)
-관리자 페이지: 브라우저로 `https://<서버>/admin` 을 열고 ADMIN_TOKEN 을 붙여 넣으면 사용자 목록과 사용자별 AI 모델 선택이 보인다. 토큰은 그 탭의 sessionStorage 에만 둔다. ADMIN_TOKEN 이 없으면 페이지도 404.
+## 관리자 페이지 · API (`ADMIN_PASSWORD`, 사용자 로그인과 별개)
+브라우저로 `https://<서버>/admin` 을 열고 비밀번호로 로그인하면 사용자 목록과 사용자별 AI 모델 선택이 보인다. 로그인하면 30일짜리 쿠키(`fd_admin`, HttpOnly·SameSite=Strict, https면 Secure)를 받으므로 그동안은 다시 입력하지 않는다. 쿠키 서명 키는 비밀번호에서 만들어서, 비밀번호를 바꾸면 기존 로그인이 모두 풀린다. 같은 주소에서 15분에 5번(전체 50번) 틀리면 15분 동안 429 `TOO_MANY_ATTEMPTS`.
 
 | | |
 |---|---|
+| POST `/api/admin/login` | `{"password":"..."}` → 204 + 쿠키. 틀리면 401 `WRONG_PASSWORD` |
+| POST `/api/admin/logout` | 쿠키를 지운다 |
+| GET `/api/admin/session` | 로그인돼 있으면 200, 아니면 401 |
 | GET `/api/admin/ai-models` | `{default, allowed[]}` |
 | GET `/api/admin/users?limit=50&offset=0` | 최근 가입 순 `{users:[{id, createdAt, nickname, providers[], aiModel(지정, 없으면 null), effectiveModel(실제로 쓰는 모델)}]}` |
 | PUT `/api/admin/users/{id}/ai-model` | `{"model":"gemini-3.8-flash"}` 지정, `{"model":null}` 기본으로. 허용 목록 밖 400 `INVALID`, 없는 사용자 404 |
 
 ```bash
-curl -H "X-Admin-Token: $ADMIN_TOKEN" https://<서버>/api/admin/users
-curl -X PUT -H "X-Admin-Token: $ADMIN_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"model":"gemini-3.8-flash"}' https://<서버>/api/admin/users/<id>/ai-model
+curl -c admin.jar -H 'Content-Type: application/json' -d '{"password":"…"}' https://<서버>/api/admin/login
+curl -b admin.jar https://<서버>/api/admin/users
 ```
 
 ## 사진 백업 (설정에서 켠 사용자만)

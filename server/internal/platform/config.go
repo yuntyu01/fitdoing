@@ -11,16 +11,16 @@ import (
 
 // Config is read from environment variables.
 type Config struct {
-	Port        string
-	DBDriver    string // postgres | sqlite
-	DBDSN       string
-	AIProvider  string // mock | gemini
-	GeminiKey   string
-	GeminiModel string   // default model for every user
-	GeminiExtra []string // models an admin may assign per user besides the default: BuiltinGeminiModels + GEMINI_MODELS
-	AdminToken  string   // ADMIN_TOKEN: X-Admin-Token of /api/admin/* (32+ chars); "" = admin API off
-	Zone        *time.Location
-	CORSOrigins []string
+	Port          string
+	DBDriver      string // postgres | sqlite
+	DBDSN         string
+	AIProvider    string // mock | gemini
+	GeminiKey     string
+	GeminiModel   string   // default model for every user
+	GeminiExtra   []string // models an admin may assign per user besides the default: BuiltinGeminiModels + GEMINI_MODELS
+	AdminPassword string   // ADMIN_PASSWORD: admin page login (10+ chars); "" = admin page and API off
+	Zone          *time.Location
+	CORSOrigins   []string
 
 	AuthSecret      string   // signs login tokens (HS256); required with Postgres
 	GoogleClientIDs []string // accepted audiences of Google ID tokens (the web client id the app signs in with)
@@ -55,7 +55,7 @@ const defaultPostgresDSN = "host=localhost user=fitdoing password=fitdoing dbnam
 //	KAKAO_APP_ID       numeric Kakao app id
 //	KAKAO_TOKEN_INFO_URL  (optional) replaces Kakao's token-info URL, for end-to-end tests with a fake Kakao
 //	GEMINI_MODELS      (optional) comma separated models to add to BuiltinGeminiModels; GEMINI_MODEL stays the default
-//	ADMIN_TOKEN        (optional, 32+ chars) enables the admin API (X-Admin-Token header)
+//	ADMIN_PASSWORD     (optional, 10+ chars) enables the admin page /admin and its API
 func LoadConfig(getenv func(string) string) (Config, error) {
 	env := func(k, def string) string {
 		if v := strings.TrimSpace(getenv(k)); v != "" {
@@ -74,9 +74,11 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 			c.GeminiExtra = append(c.GeminiExtra, m)
 		}
 	}
-	c.AdminToken = strings.TrimSpace(getenv("ADMIN_TOKEN"))
-	if c.AdminToken != "" && len(c.AdminToken) < 32 {
-		return c, fmt.Errorf("ADMIN_TOKEN은 32자 이상이어야 해요 (예: openssl rand -hex 32)")
+	c.AdminPassword = getenv("ADMIN_PASSWORD")
+	if strings.TrimSpace(c.AdminPassword) == "" {
+		c.AdminPassword = ""
+	} else if len([]rune(c.AdminPassword)) < 10 {
+		return c, fmt.Errorf("ADMIN_PASSWORD는 10자 이상이어야 해요")
 	}
 	c.AuthSecret = strings.TrimSpace(getenv("AUTH_SECRET"))
 	c.AuthDisabled = strings.TrimSpace(getenv("AUTH_DISABLED")) == "1"

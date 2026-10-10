@@ -10,13 +10,15 @@
 <body>
 <main>
   <h1>핏두잉 관리자</h1>
-  <form id="login">
-    <label for="token">관리자 토큰 (ADMIN_TOKEN)</label>
+  <form id="login" hidden>
+    <!-- 브라우저 비밀번호 관리자가 저장·자동 입력하도록 사용자명 칸을 둔다 -->
+    <input type="text" name="username" value="admin" autocomplete="username" hidden readonly>
+    <label for="password">관리자 비밀번호</label>
     <div class="row">
-      <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="토큰을 붙여 넣으세요">
-      <button type="submit">불러오기</button>
+      <input id="password" name="password" type="password" autocomplete="current-password" spellcheck="false" required>
+      <button type="submit">로그인</button>
     </div>
-    <p class="note">토큰은 이 탭에만 기억해요. 탭을 닫으면 지워져요.</p>
+    <p class="note">한 번 로그인하면 이 브라우저에서 30일 동안 유지돼요.</p>
   </form>
   <p id="status" role="status"></p>
   <section id="panel" hidden>
@@ -29,7 +31,7 @@
     </div>
     <div class="row end">
       <button id="more" type="button" class="ghost">더 보기</button>
-      <button id="logout" type="button" class="ghost">토큰 지우기</button>
+      <button id="logout" type="button" class="ghost">로그아웃</button>
     </div>
   </section>
 </main>

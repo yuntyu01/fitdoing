@@ -4,6 +4,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/yuntyu01/fitdoing/server/internal/admin"
 	"github.com/yuntyu01/fitdoing/server/internal/ai"
@@ -29,8 +30,9 @@ type Options struct {
 	PublicURL    string      // PUBLIC_BASE_URL: base of the public share page links ("" = from the request)
 	// AIModels: the analyzer per allowed model (GEMINI_MODEL default + GEMINI_MODELS). nil = only the analyzer
 	// given to New, as the default model.
-	AIModels   *ai.ModelSet
-	AdminToken string // ADMIN_TOKEN: enables /api/admin/* ("" = admin API off)
+	AIModels      *ai.ModelSet
+	AdminPassword string           // ADMIN_PASSWORD: enables /admin and /api/admin/* ("" = off)
+	Now           func() time.Time // admin session clock (tests); nil = time.Now
 }
 
 // New builds the full HTTP handler (routes + CORS + request logging).
@@ -78,7 +80,7 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 		models = ai.SingleModel(db, "default", analyzer)
 	}
 	ai.Register(mux, models)
-	admin.Register(mux, db, o.AdminToken, models)
+	admin.Register(mux, db, o.AdminPassword, models, o.Now)
 	meal.Register(mux, mealSvc)
 	lock.Register(mux, lockSvc)
 	coupon.Register(mux, couponSvc)
