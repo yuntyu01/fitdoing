@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import type { Settings } from '../../../db/schema';
+import { dateKey } from '../../../domain/time';
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
 import { fonts, layout, radius } from '../../../ui/tokens';
 import { formatRemaining, hhmm } from '../format';
@@ -19,9 +20,10 @@ const MEAL_GAP = 12; // 끼니 제목 ↔ 시간
 const GYM_GAP = 4; // 헬스 제목 ↔ 횟수 ↔ 시간
 
 /**
- * 끼니 타일 + 헬스 타일 가로 줄. 화면 양끝까지 펼친 캐러셀이라 좌우로 끌 수 있고, 타일 단위로 멈춘다.
- * 지금 기록할 끼니(없으면 다음 끼니, 그것도 없으면 마지막 타일)가 화면 가운데에 오도록 시작한다.
- * 지금 끼니는 진행 막대 색으로 채우고, 기록한 끼니는 오른쪽 위 모서리에 작은 체크.
+ * 끼니 타일 + 헬스 타일 가로 줄. 왼쪽부터 붙이고, 화면을 넘칠 때만 좌우로 끌 수 있다(타일 단위로 멈춘다).
+ * 넘칠 때는 지금 기록할 끼니(없으면 다음 끼니, 그것도 없으면 마지막 타일)가 가운데 오도록 굴려 두되,
+ * 양끝은 넘어가지 않는다(타일이 적으면 왼쪽에 빈칸을 만들지 않는다).
+ * 지금 끼니는 진행 막대 색으로 채우고, 기록한 끼니는 오른쪽 위 모서리에 작은 체크. 기록한 끼니를 누르면 그 끼니 기록을 연다.
  */
 export function TileRow({ data, settings, now }: { data: TodayData; settings: Settings; now: Date }) {
   const { t } = useTranslation();
@@ -31,12 +33,13 @@ export function TileRow({ data, settings, now }: { data: TodayData; settings: Se
   const ref = useRef<ScrollView>(null);
 
   const count = data.meals.length + (settings.gym.enabled ? 1 : 0);
-  // 양끝 타일도 가운데까지 올 수 있게 좌우에 (화면 - 타일) / 2 만큼 여유를 둔다
-  const side = Math.max(layout.strip, (width - W) / 2);
+  const side = layout.strip;
   let focus = data.meals.findIndex((m) => m.state === 'current');
   if (focus < 0) focus = data.meals.findIndex((m) => m.state === 'upcoming');
   if (focus < 0) focus = count - 1;
-  const x = Math.max(0, focus * STEP + side + W / 2 - width / 2);
+  const content = side * 2 + count * W + Math.max(0, count - 1) * GAP;
+  const maxX = Math.max(0, content - width);
+  const x = Math.min(maxX, Math.max(0, focus * STEP + side + W / 2 - width / 2));
 
   useEffect(() => {
     ref.current?.scrollTo({ x, animated: false });
@@ -60,8 +63,20 @@ export function TileRow({ data, settings, now }: { data: TodayData; settings: Se
         else if (m.state === 'missed') sub = t('home.missed');
         else sub = t('common.until', { time: hhmm(m.at) });
 
+        const logged = m.state === 'logged';
         return (
-          <View key={m.index} style={[styles.tile, on && styles.tileOn]}>
+          <Pressable
+            key={m.index}
+            disabled={!logged}
+            accessibilityRole={logged ? 'button' : undefined}
+            onPress={() =>
+              router.push({
+                pathname: '/capture/review',
+                params: { date: dateKey(data.day), index: String(m.index), edit: '1' },
+              })
+            }
+            style={({ pressed }) => [styles.tile, on && styles.tileOn, pressed && styles.pressed]}
+          >
             {m.state === 'logged' ? (
               <View style={styles.check}>
                 <Check size={11} color={c.sub} strokeWidth={2.4} />
@@ -71,7 +86,7 @@ export function TileRow({ data, settings, now }: { data: TodayData; settings: Se
             <Text style={[styles.sub, styles.mealSub, on && styles.textOn, m.state === 'missed' && styles.faint]}>
               {sub}
             </Text>
-          </View>
+          </Pressable>
         );
       })}
       {settings.gym.enabled ? (
@@ -108,6 +123,7 @@ const makeStyles = (c: Palette) =>
       justifyContent: 'center',
     },
     tileOn: { backgroundColor: c.bar },
+    pressed: { opacity: 0.7 },
     check: { position: 'absolute', top: 6, right: 6 },
     title: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: TITLE_LH, color: c.text, textAlign: 'center' },
     textOn: { fontFamily: fonts.bold, color: c.bg },

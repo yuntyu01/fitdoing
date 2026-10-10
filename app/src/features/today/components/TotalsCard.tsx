@@ -16,15 +16,22 @@ export function TotalsCard({
   totals,
   targets,
   loggedCount,
+  title,
+  compact: compactProp,
 }: {
   totals: Nutrition;
   targets: Targets;
   loggedCount: number;
+  /** 기본 "오늘 합계" (기록 화면에서는 그날) */
+  title?: string;
+  /** 탄단지 목표를 숫자 아래 줄에 둔다. 기본은 화면 폭으로 정하고, 여백이 넓은 화면(기록)은 늘 켠다. */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const c = usePalette();
   const styles = useThemedStyles(makeStyles);
-  const compact = useWindowDimensions().width < COMPACT_W;
+  const narrow = useWindowDimensions().width < COMPACT_W;
+  const compact = compactProp ?? narrow;
   const macros = [
     { key: 'carbs', label: t('home.carbs'), v: totals.carbs, goal: targets.carbs },
     { key: 'protein', label: t('home.protein'), v: totals.protein, goal: targets.protein },
@@ -34,7 +41,7 @@ export function TotalsCard({
   return (
     <View style={styles.card}>
       <View style={styles.head}>
-        <Text style={styles.title}>{t('home.totals')}</Text>
+        <Text style={styles.title}>{title ?? t('home.totals')}</Text>
         <Text style={styles.meta}>{t('home.loggedCount', { n: loggedCount })}</Text>
       </View>
 

@@ -15,7 +15,8 @@ interface DraftState {
 }
 
 export const useOnboardingDraft = create<DraftState>((set, get) => ({
-  settings: initialSettings(),
+  // 마감 알림은 꺼진 채로 시작한다. 사용자가 켜는 순간 알림 권한을 묻는다(끼니 단계의 스위치).
+  settings: { ...initialSettings(), notifications: false },
   set: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
   setAll: (settings) => set({ settings }),
   finalize: () => ({ ...get().settings, nickname: cleanNickname(get().settings.nickname) }),

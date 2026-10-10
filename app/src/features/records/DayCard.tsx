@@ -2,7 +2,11 @@ import { ChevronRight, Utensils } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { router } from 'expo-router';
+
 import type { DayDetail } from '../../domain/records';
+import type { Targets } from '../../domain/targets';
+import { TotalsCard } from '../today/components/TotalsCard';
 import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
 import { fonts, layout, radius, text } from '../../ui/tokens';
 import { clock, eatenFoodNames, fullDate, kcalText, macroText, type MealRow } from './format';
@@ -10,18 +14,20 @@ import { clock, eatenFoodNames, fullDate, kcalText, macroText, type MealRow } fr
 const THUMB = 60;
 
 /**
- * 달력에서 고른 날 (상자 없음): 날짜 제목 + 오른쪽 상태, 요약 한 줄, 합계 한 줄, 기록한 끼니 줄(사진·끼니·시각·음식 이름).
- * 끼니 줄을 누르면 하루 상세로 간다.
+ * 달력에서 고른 날 (상자 없음): 날짜 제목 + 오른쪽 상태, 요약 한 줄, 그날 목표 대비 합계 막대, 기록한 끼니 줄.
+ * 끼니 줄을 누르면 그 끼니 기록(사진·음식·영양)을 연다. 헬스·잠금까지 보려면 아래 "하루 전체 보기".
  */
 export function DayCard({
   detail,
   meals,
   isToday,
+  targets,
   onOpen,
 }: {
   detail: DayDetail;
   meals: MealRow[]; // 그날 기록한 끼니 (1끼부터)
   isToday: boolean;
+  targets: Targets; // 그날 적용되던 목표
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
@@ -50,12 +56,13 @@ export function DayCard({
         <View style={styles.lines}>
           <Text style={styles.summary}>{summary.join(' · ')}</Text>
           {meals.length > 0 ? (
-            <Text style={styles.totals}>
-              <Text style={styles.kcal}>
-                {kcalText(totals.kcal)} {t('common.kcal')}
-              </Text>
-              {` · ${macroText(t, totals)}`}
-            </Text>
+            <TotalsCard
+              totals={totals}
+              targets={targets}
+              loggedCount={meals.length}
+              title={t('records.dayTotals')}
+              compact
+            />
           ) : null}
         </View>
       )}
@@ -67,7 +74,12 @@ export function DayCard({
             return (
               <Pressable
                 key={m.index}
-                onPress={onOpen}
+                onPress={() =>
+                  router.push({
+                    pathname: '/capture/review',
+                    params: { date: detail.date, index: String(m.index), edit: '1' },
+                  })
+                }
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
                 accessibilityRole="button"
               >
@@ -95,8 +107,9 @@ export function DayCard({
             );
           })}
         </View>
-      ) : !detail.empty ? (
-        // 끼니 기록은 없어도 헬스·잠금 기록은 하루 상세에서 볼 수 있게
+      ) : null}
+      {!detail.empty ? (
+        // 헬스·잠금까지 그날 전체는 하루 상세에서
         <Pressable onPress={onOpen} style={({ pressed }) => [styles.open, pressed && styles.pressed]} hitSlop={8}>
           <Text style={styles.openText}>{t('records.openDay')}</Text>
           <ChevronRight size={16} color={c.sub} strokeWidth={1.8} />
@@ -114,8 +127,6 @@ const makeStyles = (c: Palette) =>
     empty: { ...text.body, color: c.sub, marginTop: layout.related },
     lines: { marginTop: layout.related, gap: 4 },
     summary: { ...text.body, color: c.text },
-    totals: { ...text.body, color: c.sub, fontVariant: ['tabular-nums'] },
-    kcal: { fontFamily: fonts.semibold, color: c.text },
     list: { marginTop: layout.inner, gap: 4 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6 },
     pressed: { opacity: 0.6 },

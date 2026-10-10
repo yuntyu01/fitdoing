@@ -7,9 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Settings } from '../../db/schema';
 import { isEmptyMonth, monthOf, sameMonth, shiftMonth, type YearMonth } from '../../domain/calendar';
 import { buildDayDetail } from '../../domain/records';
+import { targetsOn } from '../../domain/targets';
 import { dateKey } from '../../domain/time';
 import { Calendar, CalendarLegend } from '../../features/records/Calendar';
 import { DayCard } from '../../features/records/DayCard';
+import { MonthPickerSheet } from '../../features/records/MonthPickerSheet';
 import { loggedMealsOf } from '../../features/records/format';
 import { useMonthRecords } from '../../features/records/useMonthRecords';
 import { useSettingsValue } from '../../features/settings/store';
@@ -68,6 +70,7 @@ function CalendarTab({ settings, now }: { settings: Settings; now: Date }) {
   const today = dateKey(now);
   const [ym, setYm] = useState<YearMonth>(() => monthOf(new Date()));
   const [picked, setPicked] = useState<string | null>(null);
+  const [pickingMonth, setPickingMonth] = useState(false);
 
   const rec = useMonthRecords(ym, settings.meals.length);
   const isCurrent = sameMonth(ym, monthOf(now));
@@ -93,6 +96,7 @@ function CalendarTab({ settings, now }: { settings: Settings; now: Date }) {
           setYm((cur) => shiftMonth(cur, d));
           setPicked(null);
         }}
+        onPickMonth={() => setPickingMonth(true)}
         note={
           empty
             ? t('records.monthEmpty')
@@ -107,12 +111,24 @@ function CalendarTab({ settings, now }: { settings: Settings; now: Date }) {
             detail={detail}
             meals={meals}
             isToday={detail.date === today}
+            targets={targetsOn(settings.targetHistory, settings.targets, detail.date)}
             onOpen={() => router.push({ pathname: '/day', params: { date: detail.date } })}
           />
         ) : (
           <Text style={styles.hint}>{t('records.pickDay')}</Text>
         )}
       </View>
+      <MonthPickerSheet
+        visible={pickingMonth}
+        value={ym}
+        latest={monthOf(now)}
+        onClose={() => setPickingMonth(false)}
+        onPick={(next) => {
+          setYm(next);
+          setPicked(null);
+          setPickingMonth(false);
+        }}
+      />
     </View>
   );
 }

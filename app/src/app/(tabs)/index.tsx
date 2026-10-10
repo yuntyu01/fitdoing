@@ -10,6 +10,7 @@ import { TileRow } from '../../features/today/components/TileRow';
 import { TotalsCard } from '../../features/today/components/TotalsCard';
 import { hhmm } from '../../features/today/format';
 import { useNow, useToday } from '../../features/today/useToday';
+import { useLockReady } from '../../features/lock/useLockReady';
 import { useWeeklyRows } from '../../features/weekly/useWeeklyRows';
 import { WeeklyCard } from '../../features/weekly/WeeklyCard';
 import { useTabBarSpace } from '../../ui/FloatingTabBar';
@@ -28,9 +29,13 @@ export default function TodayScreen() {
   const data = useToday(settings, now);
   const weeklyRows = useWeeklyRows(now);
 
+  const lockReady = useLockReady(settings);
   const cur = data.current;
+  // 잠금이 실제로 걸릴 때만(순한맛 아님 + 잠금 권한) "앱 잠금"을 말한다. 아니면 마감 시각만 안내한다.
   const guide = cur
-    ? t('home.guide', { meal: cur.index, time: hhmm(cur.at), hours: settings.lockMinutes / 60 })
+    ? lockReady
+      ? t('home.guide', { meal: cur.index, time: hhmm(cur.at), hours: settings.lockMinutes / 60 })
+      : t('home.guideNoLock', { meal: cur.index, time: hhmm(cur.at) })
     : data.loggedCount === data.meals.length
       ? t('home.guideDone')
       : t('home.guideNone');

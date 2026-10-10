@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, Circle, Dumbbell, Lock } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Dumbbell, Lock } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -15,6 +15,8 @@ interface Props {
   selected: string | null;
   onSelect: (date: string) => void;
   onShift: (delta: number) => void;
+  /** 달 제목을 누르면 (연·월 고르기) */
+  onPickMonth?: () => void;
   note?: string; // 달 제목 아래 한 줄 (이 달 요약)
 }
 
@@ -24,14 +26,24 @@ const MARK = 10; // 숫자 아래 작은 표시 크기
  * 상자 없는 달력. 오늘은 얇은 테두리, 고른 날(오늘이 아니면)은 회색 채움.
  * 숫자 아래에 끼니(모두 ✓ / 일부 ○), 잠김, 헬스를 작게 — 한 칸에 셋까지만.
  */
-export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift, note }: Props) {
+export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift, onPickMonth, note }: Props) {
   const { t } = useTranslation();
   const c = usePalette();
   const styles = useThemedStyles(makeStyles);
   return (
     <View>
       <View style={styles.head}>
-        <Text style={styles.month}>{t('records.monthTitle', { year: ym.year, month: ym.month + 1 })}</Text>
+        <Pressable
+          onPress={onPickMonth}
+          disabled={!onPickMonth}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityHint={t('records.pickMonth')}
+          style={({ pressed }) => [styles.monthBtn, pressed && styles.pressed]}
+        >
+          <Text style={styles.month}>{t('records.monthTitle', { year: ym.year, month: ym.month + 1 })}</Text>
+          {onPickMonth ? <ChevronDown size={18} color={c.sub} strokeWidth={1.8} /> : null}
+        </Pressable>
         <View style={styles.nav}>
           <Pressable onPress={() => onShift(-1)} hitSlop={12} accessibilityLabel={t('records.prevMonth')}>
             <ChevronLeft size={22} color={c.text} strokeWidth={1.8} />
@@ -108,6 +120,8 @@ export function CalendarLegend() {
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
+    pressed: { opacity: 0.6 },
+    monthBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: layout.related },
     month: { ...text.heading, color: c.text, fontVariant: ['tabular-nums'] },
     nav: { flexDirection: 'row', alignItems: 'center', gap: 20 },

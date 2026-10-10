@@ -36,6 +36,11 @@ export interface LockEngine {
   drainEventLog(): Promise<LoggedEngineEvent[]>;
   onLockStarted(cb: (e: LockEngineEvent) => void): { remove: () => void };
   onLockReleased(cb: (e: LockEngineEvent) => void): { remove: () => void };
+  /**
+   * 지금 실제로 다른 앱을 막을 수 있는지: 네이티브 엔진이 있고 사용 기록 접근·다른 앱 위에 표시 권한이 있을 때만.
+   * 없으면(권한 미허용·웹·메모리 엔진) 홈에서 "잠금" 안내를 하지 않는다.
+   */
+  canLock?(): Promise<boolean>;
 }
 
 type Listener = (e: LockEngineEvent) => void;
@@ -83,6 +88,7 @@ interface RawModule {
   addListener?: (event: string, cb: (e: LockEngineEvent) => void) => { remove: () => void };
   onLockStarted?: (cb: (e: LockEngineEvent) => void) => { remove: () => void };
   onLockReleased?: (cb: (e: LockEngineEvent) => void) => { remove: () => void };
+  getPermissionStatus?: () => unknown;
 }
 
 function loadNative(): RawModule | null {
@@ -134,6 +140,11 @@ function nativeEngine(m: RawModule): LockEngine {
     drainEventLog: () => safe(() => m.drainEventLog?.(), [] as LoggedEngineEvent[]),
     onLockStarted: (cb) => on('onLockStarted', cb),
     onLockReleased: (cb) => on('onLockReleased', cb),
+    canLock: () =>
+      safe(async () => {
+        const p = (await m.getPermissionStatus?.()) as { usageAccess?: boolean; overlay?: boolean } | undefined;
+        return !!p?.usageAccess && !!p?.overlay;
+      }, false),
   };
 }
 

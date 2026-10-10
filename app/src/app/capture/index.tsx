@@ -77,7 +77,8 @@ export default function CaptureScreen() {
     setError(false);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      const pic = await camera.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
+      // 촬영음은 끈다. 한국·일본 판매 기기(특히 iOS)는 OS가 촬영음을 강제해서 이 옵션이 무시될 수 있다.
+      const pic = await camera.current.takePictureAsync({ quality: 0.9, skipProcessing: false, shutterSound: false });
       if (gym) {
         // 헬스 사진 인증: 끼니 기록이 아니므로 리뷰 없이 도착 인증만 남기고 잠금을 푼다.
         releaseGymLock('photo');

@@ -48,7 +48,7 @@ export function TimeSheet({ visible, title, value, onClose, onConfirm }: Props) 
   }
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title={title ?? t('timeSheet.title')}>
+    <BottomSheet visible={visible} onClose={onClose} title={title ?? t('timeSheet.title')} dismissKeyboardOnTap={false}>
       <View style={styles.wheels}>
         <View pointerEvents="none" style={styles.band} />
         <Wheel items={HOURS} value={h} onChange={setH} visible={visible} styles={styles} />
@@ -85,7 +85,12 @@ function Wheel({
 
   const settle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.min(items.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.y / ITEM)));
-    onChange(items[i]);
+    if (items[i] !== value) onChange(items[i]);
+  };
+  // 손을 뗄 때 아직 굴러가는 중이면(관성·스냅) 멈춘 뒤(onMomentumScrollEnd)에만 값을 정한다.
+  // 굴러가는 도중에 값을 바꿔 다시 그리면 안드로이드에서 휠이 튀거나 멈춘다.
+  const endDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (Math.abs(e.nativeEvent.velocity?.y ?? 0) < 0.05) settle(e);
   };
 
   return (
@@ -97,7 +102,8 @@ function Wheel({
       decelerationRate="fast"
       contentContainerStyle={{ paddingVertical: ITEM * Math.floor(VISIBLE / 2) }}
       onMomentumScrollEnd={settle}
-      onScrollEndDrag={settle}
+      onScrollEndDrag={endDrag}
+      nestedScrollEnabled
     >
       {items.map((v) => (
         <View key={v} style={styles.item}>

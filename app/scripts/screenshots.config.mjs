@@ -78,6 +78,7 @@ export const SCREENS = [
     },
   },
   { route: '/records', name: 'records' },
+  { route: '/records', name: 'records-month-picker', actions: (page) => openByText(page, '2026년 9월') },
   { route: '/settings', name: 'settings', fullPage: true },
   { route: '/settings', name: 'coupon-sheet', actions: (page) => openByText(page, '쿠폰') },
   { route: '/login', name: 'login', mode: 'loggedOut' },

@@ -15,7 +15,7 @@
       "package": "com.fitdoing.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#F2F4F6",
+        "backgroundColor": "#191919",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -38,9 +38,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F2F4F6",
+          "backgroundColor": "#F4F4F2",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 160,
+          "dark": { "backgroundColor": "#191919", "image": "./assets/splash-icon-dark.png" }
         }
       ],
       [

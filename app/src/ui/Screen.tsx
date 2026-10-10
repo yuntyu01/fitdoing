@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useThemedStyles, type Palette } from './theme';
@@ -20,7 +20,9 @@ export function Screen({ header, title, desc, children, footer, gap = layout.blo
   const styles = useThemedStyles(makeStyles);
   return (
     <SafeAreaView style={styles.safe} edges={footer ? ['top', 'bottom'] : ['top']}>
-      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* RN 0.86 안드로이드는 edge-to-edge 라 창이 키보드만큼 줄지 않는다(adjustResize 무효). 두 플랫폼 모두 padding 으로
+          올려야 입력칸(닉네임 등)이 키보드에 가리지 않는다. 안드로이드 ScrollView 는 줄어들 때 포커스된 칸을 보이게 굴린다. */}
+      <KeyboardAvoidingView style={styles.fill} behavior="padding">
         {header ? <View style={styles.header}>{header}</View> : null}
         <ScrollView
           contentContainerStyle={[styles.body, { paddingBottom: bottomSpace ?? layout.block }]}

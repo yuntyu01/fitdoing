@@ -11,10 +11,15 @@ interface Props {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  /**
+   * 내용의 빈 곳을 누르면 키보드를 내린다(입력칸이 있는 시트용, 기본 켜짐). 휠처럼 끄는 동작이 있는 시트는 끈다:
+   * 내용을 Pressable 로 감싸면 안드로이드에서 스크롤과 터치를 서로 가져가려다 휠이 버벅이거나 멈춘다.
+   */
+  dismissKeyboardOnTap?: boolean;
 }
 
 /** 바탕은 서서히 어두워지고 시트는 아래에서 올라온다. 손잡이 + 제목 + 닫기(X). 닫으면(바깥·X·뒤로) 바꾼 값은 버린다. */
-export function BottomSheet({ visible, onClose, title, children }: Props) {
+export function BottomSheet({ visible, onClose, title, children, dismissKeyboardOnTap = true }: Props) {
   const c = usePalette();
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
@@ -37,6 +42,21 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
 
   if (!mounted) return null;
 
+  const body = (
+    <>
+      <View style={styles.handle} />
+      {title ? (
+        <View style={styles.head}>
+          <Text style={styles.title}>{title}</Text>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="close">
+            <X size={24} color={c.text} strokeWidth={1.8} />
+          </Pressable>
+        </View>
+      ) : null}
+      {children}
+    </>
+  );
+
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
 
   return (
@@ -53,18 +73,13 @@ export function BottomSheet({ visible, onClose, title, children }: Props) {
           ]}
         >
           {/* 입력 밖을 누르면 키보드를 내린다 */}
-          <Pressable onPress={Keyboard.dismiss} accessible={false}>
-            <View style={styles.handle} />
-            {title ? (
-              <View style={styles.head}>
-                <Text style={styles.title}>{title}</Text>
-                <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="close">
-                  <X size={24} color={c.text} strokeWidth={1.8} />
-                </Pressable>
-              </View>
-            ) : null}
-            {children}
-          </Pressable>
+          {dismissKeyboardOnTap ? (
+            <Pressable onPress={Keyboard.dismiss} accessible={false}>
+              {body}
+            </Pressable>
+          ) : (
+            <View>{body}</View>
+          )}
         </Animated.View>
       </View>
     </Modal>
