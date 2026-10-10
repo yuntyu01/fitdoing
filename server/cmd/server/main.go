@@ -38,10 +38,21 @@ func run() error {
 	if err := api.Migrate(db); err != nil {
 		return err
 	}
-	analyzer, err := ai.New(cfg.AIProvider, cfg.GeminiKey, cfg.GeminiModel)
+	// one analyzer per allowed model: GEMINI_MODEL (default) + GEMINI_MODELS (assigned per user by an admin)
+	names := append([]string{cfg.GeminiModel}, cfg.GeminiExtra...)
+	analyzers := map[string]ai.FoodAnalyzer{}
+	for _, name := range names {
+		a, err := ai.New(cfg.AIProvider, cfg.GeminiKey, name)
+		if err != nil {
+			return err
+		}
+		analyzers[name] = a
+	}
+	models, err := ai.NewModelSet(db, cfg.GeminiModel, names, analyzers)
 	if err != nil {
 		return err
 	}
+	analyzer := analyzers[cfg.GeminiModel]
 	authSvc := auth.NewService(db, cfg.AuthSecret, map[auth.Provider]auth.Verifier{
 		auth.Kakao:  &auth.KakaoVerifier{AppID: cfg.KakaoAppID, URL: cfg.KakaoInfoURL},
 		auth.Google: auth.NewGoogle(cfg.GoogleClientIDs),
@@ -54,6 +65,8 @@ func run() error {
 		Addr: ":" + cfg.Port,
 		Handler: api.New(db, analyzer, platform.Clock{Loc: cfg.Zone}, cfg.CORSOrigins, authSvc, api.Options{
 			AuthDisabled: cfg.AuthDisabled,
+			AIModels:     models,
+			AdminToken:   cfg.AdminToken,
 			PhotoStore:   photoStore(cfg),
 			PublicURL:    cfg.PublicURL,
 		}),
@@ -67,7 +80,8 @@ func run() error {
 		defer cancel()
 		_ = srv.Shutdown(ctx)
 	}()
-	slog.Info("listening", "addr", srv.Addr, "db", cfg.DBDriver, "ai", cfg.AIProvider)
+	slog.Info("listening", "addr", srv.Addr, "db", cfg.DBDriver, "ai", cfg.AIProvider, "models", names,
+		"admin", cfg.AdminToken != "")
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

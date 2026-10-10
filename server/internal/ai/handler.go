@@ -16,9 +16,10 @@ const (
 )
 
 // Register adds POST /api/meals/analyze. The app sends a downscaled photo (long side 1024px);
-// the result JSON is returned and the photo is dropped.
-func Register(mux *http.ServeMux, analyzer FoodAnalyzer) {
-	mux.HandleFunc("POST /api/meals/analyze", platform.WithUser(func(w http.ResponseWriter, r *http.Request, _ string) error { // costs money: login required
+// the result JSON is returned and the photo is dropped. The model is the one an admin assigned to the user,
+// else the default; the response header X-AI-Model names it.
+func Register(mux *http.ServeMux, models *ModelSet) {
+	mux.HandleFunc("POST /api/meals/analyze", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error { // costs money: login required
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequest)
 		// Parse fully in memory (limit == request cap) so nothing is spilled to a temp file.
 		err := r.ParseMultipartForm(maxRequest)
@@ -53,10 +54,15 @@ func Register(mux *http.ServeMux, analyzer FoodAnalyzer) {
 		if len(data) == 0 || !strings.HasPrefix(contentType, "image/") {
 			return platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
 		}
+		analyzer, model, err := models.For(uid)
+		if err != nil {
+			return err
+		}
 		res, err := analyzer.Analyze(r.Context(), data, contentType)
 		if err != nil {
 			return err
 		}
+		w.Header().Set("X-AI-Model", model)
 		if res.Items == nil {
 			res.Items = []Item{}
 		}

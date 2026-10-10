@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	neturl "net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -15,7 +16,9 @@ type Config struct {
 	DBDSN       string
 	AIProvider  string // mock | gemini
 	GeminiKey   string
-	GeminiModel string
+	GeminiModel string   // default model for every user
+	GeminiExtra []string // GEMINI_MODELS: more models an admin may assign per user (comma separated)
+	AdminToken  string   // ADMIN_TOKEN: X-Admin-Token of /api/admin/* (32+ chars); "" = admin API off
 	Zone        *time.Location
 	CORSOrigins []string
 
@@ -47,6 +50,8 @@ const defaultPostgresDSN = "host=localhost user=fitdoing password=fitdoing dbnam
 //	APPLE_CLIENT_ID    Apple audience (default com.fitdoing.app)
 //	KAKAO_APP_ID       numeric Kakao app id
 //	KAKAO_TOKEN_INFO_URL  (optional) replaces Kakao's token-info URL, for end-to-end tests with a fake Kakao
+//	GEMINI_MODELS      (optional) comma separated extra models an admin can assign per user; GEMINI_MODEL stays the default
+//	ADMIN_TOKEN        (optional, 32+ chars) enables the admin API (X-Admin-Token header)
 func LoadConfig(getenv func(string) string) (Config, error) {
 	env := func(k, def string) string {
 		if v := strings.TrimSpace(getenv(k)); v != "" {
@@ -59,6 +64,15 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		AIProvider:  env("AI_PROVIDER", "mock"),
 		GeminiKey:   getenv("GEMINI_API_KEY"),
 		GeminiModel: env("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+	}
+	for _, m := range strings.Split(getenv("GEMINI_MODELS"), ",") {
+		if m = strings.TrimSpace(m); m != "" && m != c.GeminiModel && !slices.Contains(c.GeminiExtra, m) {
+			c.GeminiExtra = append(c.GeminiExtra, m)
+		}
+	}
+	c.AdminToken = strings.TrimSpace(getenv("ADMIN_TOKEN"))
+	if c.AdminToken != "" && len(c.AdminToken) < 32 {
+		return c, fmt.Errorf("ADMIN_TOKEN은 32자 이상이어야 해요 (예: openssl rand -hex 32)")
 	}
 	c.AuthSecret = strings.TrimSpace(getenv("AUTH_SECRET"))
 	c.AuthDisabled = strings.TrimSpace(getenv("AUTH_DISABLED")) == "1"

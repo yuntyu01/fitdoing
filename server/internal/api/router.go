@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/yuntyu01/fitdoing/server/internal/admin"
 	"github.com/yuntyu01/fitdoing/server/internal/ai"
 	"github.com/yuntyu01/fitdoing/server/internal/appsync"
 	"github.com/yuntyu01/fitdoing/server/internal/auth"
@@ -26,6 +27,10 @@ type Options struct {
 	AuthDisabled bool        // AUTH_DISABLED=1: every token is the dev user (development only)
 	PhotoStore   photo.Store // nil: photo backup answers 503 PHOTO_BACKUP_UNAVAILABLE
 	PublicURL    string      // PUBLIC_BASE_URL: base of the public share page links ("" = from the request)
+	// AIModels: the analyzer per allowed model (GEMINI_MODEL default + GEMINI_MODELS). nil = only the analyzer
+	// given to New, as the default model.
+	AIModels   *ai.ModelSet
+	AdminToken string // ADMIN_TOKEN: enables /api/admin/* ("" = admin API off)
 }
 
 // New builds the full HTTP handler (routes + CORS + request logging).
@@ -68,7 +73,12 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 	})
 	settings.Register(mux, settingsSvc)
 	auth.Register(mux, authSvc)
-	ai.Register(mux, analyzer)
+	models := o.AIModels
+	if models == nil {
+		models = ai.SingleModel(db, "default", analyzer)
+	}
+	ai.Register(mux, models)
+	admin.Register(mux, db, o.AdminToken, models)
 	meal.Register(mux, mealSvc)
 	lock.Register(mux, lockSvc)
 	coupon.Register(mux, couponSvc)

@@ -1,0 +1,125 @@
+// Package admin is the operator API: per-user AI model assignment. It is separate from user login: requests carry
+// "X-Admin-Token: <ADMIN_TOKEN>" (not the Authorization header, which is the user's login). Without ADMIN_TOKEN
+// configured every admin route answers 404.
+package admin
+
+import (
+	"crypto/subtle"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/yuntyu01/fitdoing/server/internal/ai"
+	"github.com/yuntyu01/fitdoing/server/internal/platform"
+	"gorm.io/gorm"
+)
+
+func guard(token string, h platform.HandlerFunc) http.HandlerFunc {
+	return platform.Handle(func(w http.ResponseWriter, r *http.Request) error {
+		if token == "" {
+			return &platform.Error{Status: http.StatusNotFound, Code: "NOT_FOUND", Message: "없는 주소예요"}
+		}
+		got := r.Header.Get("X-Admin-Token")
+		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
+			return &platform.Error{Status: http.StatusUnauthorized, Code: "UNAUTHORIZED", Message: "관리자 토큰이 필요해요"}
+		}
+		return h(w, r)
+	})
+}
+
+// UserRow is one user in the admin list.
+type UserRow struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	Nickname  string    `json:"nickname"`
+	Providers []string  `json:"providers"`
+	AIModel   *string   `json:"aiModel"`        // assigned by an admin; null = default
+	Effective string    `json:"effectiveModel"` // what the analyze call uses now
+}
+
+func Register(mux *http.ServeMux, db *gorm.DB, token string, models *ai.ModelSet) {
+	mux.HandleFunc("GET /api/admin/ai-models", guard(token, func(w http.ResponseWriter, r *http.Request) error {
+		platform.JSON(w, http.StatusOK, map[string]any{"default": models.Default(), "allowed": models.Allowed()})
+		return nil
+	}))
+
+	// Users, newest first. ?limit= (1~200, default 50) &offset=
+	mux.HandleFunc("GET /api/admin/users", guard(token, func(w http.ResponseWriter, r *http.Request) error {
+		limit, offset := 50, 0
+		if v := r.URL.Query().Get("limit"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 200 {
+				return platform.Invalid("limit", "1~200 사이여야 해요")
+			}
+			limit = n
+		}
+		if v := r.URL.Query().Get("offset"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 {
+				return platform.Invalid("offset", "0 이상이어야 해요")
+			}
+			offset = n
+		}
+		var users []platform.User
+		if err := db.Order("created_at DESC").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
+			return err
+		}
+		out := make([]UserRow, 0, len(users))
+		for _, u := range users {
+			row, err := userRow(db, models, u)
+			if err != nil {
+				return err
+			}
+			out = append(out, row)
+		}
+		platform.JSON(w, http.StatusOK, map[string]any{"users": out})
+		return nil
+	}))
+
+	// Body {"model": "<allowed model>"} assigns, {"model": null} goes back to the default.
+	mux.HandleFunc("PUT /api/admin/users/{id}/ai-model", guard(token, func(w http.ResponseWriter, r *http.Request) error {
+		var in struct {
+			Model *string `json:"model"`
+		}
+		if err := platform.Decode(w, r, &in); err != nil {
+			return err
+		}
+		id := r.PathValue("id")
+		if err := models.Assign(id, in.Model); err != nil {
+			return err
+		}
+		var u platform.User
+		if err := db.First(&u, "id = ?", id).Error; err != nil {
+			return err
+		}
+		row, err := userRow(db, models, u)
+		if err != nil {
+			return err
+		}
+		platform.JSON(w, http.StatusOK, row)
+		return nil
+	}))
+}
+
+func userRow(db *gorm.DB, models *ai.ModelSet, u platform.User) (UserRow, error) {
+	row := UserRow{ID: u.ID, CreatedAt: u.CreatedAt, Providers: []string{}}
+	var nick []string
+	if err := db.Table("user_settings").Where("user_id = ?", u.ID).Pluck("nickname", &nick).Error; err != nil {
+		return row, err
+	}
+	if len(nick) > 0 {
+		row.Nickname = nick[0]
+	}
+	if err := db.Table("identities").Where("user_id = ?", u.ID).Order("provider").Pluck("provider", &row.Providers).Error; err != nil {
+		return row, err
+	}
+	assigned, err := models.Assigned(u.ID)
+	if err != nil {
+		return row, err
+	}
+	if assigned != "" {
+		row.AIModel = &assigned
+	}
+	_, row.Effective, err = models.For(u.ID)
+	return row, err
+}

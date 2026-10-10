@@ -41,7 +41,9 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `DATABASE_URL`, `DB_HOST`·`DB_PORT`·`DB_NAME`·`DB_USER`·`DB_PASSWORD`·`DB_SSLMODE` | — | `DB_URL`이 없을 때 차례로 사용 (호스팅이 주입하는 DB 정보, `DB_SSLMODE` 기본 `disable`) |
 | `DB_DRIVER` | 자동 | `postgres` \| `sqlite` (`DB_URL`로 추론, 둘 다 없으면 postgres) |
 | `AI_PROVIDER` | `mock` | `mock` \| `gemini` |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `gemini-2.5-flash`는 이제 404 |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `GEMINI_MODEL`은 모든 사용자의 기본 모델. `gemini-2.5-flash`는 이제 404 |
+| `GEMINI_MODELS` | - | 관리자가 사용자별로 지정할 수 있는 추가 모델(쉼표 구분, 예: `gemini-3.8-flash`). 정확한 모델 ID는 Google AI Studio에서 확인 |
+| `ADMIN_TOKEN` | - | 32자 이상이면 관리자 API(`/api/admin/*`, 헤더 `X-Admin-Token`)를 켠다. 비우면 관리자 API는 404 |
 | `ZONE` | `Asia/Seoul` | 서버 기준 시간대(강도 변경 적용일 등) |
 | `CORS_ORIGINS` | `*` | 쉼표로 구분한 허용 출처. 웹 미리보기용 |
 | `AUTH_SECRET` | SQLite일 때만 개발용 기본값 | 로그인 토큰 서명 키, **32자 이상** (`openssl rand -hex 32`). Postgres에서 비어 있으면 서버가 시작하지 않는다 |
@@ -64,6 +66,20 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 - 음식마다 칼로리·탄단지를 받고(`items[].kcal/carbs/protein/fat`), 끼니 합계는 서버가 더한다. 응답은 숫자 누락·범위(`Result.Validate`)를 검사해서 어기면 `AI_FAILED`. 음식별 값은 `meal_items`에 저장되고(직접 입력한 음식은 null), 끼니 합계는 `meal_logs`가 기준이다.
 - 사진은 저장하지 않는다(메모리에서만 처리, 디스크에 쓰지 않음). 결과 JSON만 돌려준다: `{items:[{name, amount}], kcal, carbs, protein, fat, confidence}`
 - 사진 5MB 초과 413 `PHOTO_TOO_LARGE`, 이미지가 아니면 400 `INVALID_PHOTO`.
+- 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
+
+## 관리자 API (`X-Admin-Token: <ADMIN_TOKEN>`, 사용자 로그인과 별개)
+| | |
+|---|---|
+| GET `/api/admin/ai-models` | `{default, allowed[]}` |
+| GET `/api/admin/users?limit=50&offset=0` | 최근 가입 순 `{users:[{id, createdAt, nickname, providers[], aiModel(지정, 없으면 null), effectiveModel(실제로 쓰는 모델)}]}` |
+| PUT `/api/admin/users/{id}/ai-model` | `{"model":"gemini-3.8-flash"}` 지정, `{"model":null}` 기본으로. 허용 목록 밖 400 `INVALID`, 없는 사용자 404 |
+
+```bash
+curl -H "X-Admin-Token: $ADMIN_TOKEN" https://<서버>/api/admin/users
+curl -X PUT -H "X-Admin-Token: $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"model":"gemini-3.8-flash"}' https://<서버>/api/admin/users/<id>/ai-model
+```
 
 ## 사진 백업 (설정에서 켠 사용자만)
 - 분석용 사진은 저장하지 않는다. 사용자가 켰을 때만 앱이 끼니 사진(긴 변 1024px)을 따로 올린다. 키는 `u/<user>/<date>_<index>_<nanos>.jpg`, 행은 `meal_photos`(사용자·날짜·끼니당 하나).
@@ -131,6 +147,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `friend_cheers` | PK(`user_id`, `owner_id`, `kind`, `post_date`, `meal_index`), 둘 다 FK, INDEX(게시물) | `created_at` | 게시물(주인·종류·날짜·끼니 번호, 헬스는 0)당 한 사람 하나. CHECK `kind` ∈ meal/gym |
 | `friend_comments` | PK `id`(uuid), FK `author_id`·`owner_id`, INDEX(게시물) | `kind`, `post_date`, `meal_index`, `body`(1~300자), `created_at` | CHECK `kind` ∈ meal/gym |
 | `coupon_uses` | PK `id`, UNIQUE(`user_id`, `type`, `used_at`), INDEX(`user_id`, `week_key`) | `week_key`(그 주 월요일) | CHECK `type` ∈ rest/cheat/emergency |
+| `user_ai_models` | PK/FK `user_id` | `model`, `updated_at` | 관리자가 지정한 AI 모델. 없으면 기본 모델 |
 
 ER: `users` 1 ─ N `identities`, `users` 1 ─ N {`user_settings`(1:1), `meal_slots`, `gym_days`, `allowed_apps`, `meal_logs`, `gym_logs`, `sleep_logs`, `lock_events`, `coupon_uses`}, `meal_logs` 1 ─ N `meal_items`, `users` 1 ─ 1 `friend_codes`, `users` N ─ N `users` (`friendships`), `users` 1 ─ N `friend_cheers`·`friend_comments`(쓴 사람·게시물 주인 둘 다 CASCADE).
 

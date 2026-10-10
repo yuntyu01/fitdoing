@@ -37,3 +37,34 @@ func TestDatabaseFromHostInjectedVariables(t *testing.T) {
 		}
 	}
 }
+
+func TestAIModelsAndAdminToken(t *testing.T) {
+	base := map[string]string{"AUTH_SECRET": "0123456789abcdef0123456789abcdef", "DB_URL": "sqlite::memory:"}
+	with := func(kv ...string) map[string]string {
+		m := map[string]string{}
+		for k, v := range base {
+			m[k] = v
+		}
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return m
+	}
+	cfg, err := LoadConfig(envOf(with("GEMINI_MODELS", " gemini-3.8-flash, gemini-3.5-flash-lite ,gemini-3.8-flash,")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.GeminiModel != "gemini-3.5-flash-lite" || len(cfg.GeminiExtra) != 1 || cfg.GeminiExtra[0] != "gemini-3.8-flash" {
+		t.Fatalf("models: %q + %q", cfg.GeminiModel, cfg.GeminiExtra)
+	}
+	if cfg.AdminToken != "" {
+		t.Fatal("admin API must be off by default")
+	}
+	if _, err := LoadConfig(envOf(with("ADMIN_TOKEN", "short"))); err == nil {
+		t.Fatal("short ADMIN_TOKEN accepted")
+	}
+	cfg, err = LoadConfig(envOf(with("ADMIN_TOKEN", "0123456789abcdef0123456789abcdef")))
+	if err != nil || cfg.AdminToken == "" {
+		t.Fatalf("admin token: %v", err)
+	}
+}

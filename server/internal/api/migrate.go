@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 
+	"github.com/yuntyu01/fitdoing/server/internal/ai"
 	"github.com/yuntyu01/fitdoing/server/internal/auth"
 	"github.com/yuntyu01/fitdoing/server/internal/coupon"
 	"github.com/yuntyu01/fitdoing/server/internal/friends"
@@ -49,6 +50,7 @@ func Migrate(db *gorm.DB) error {
 	models = append(models, photo.Models()...)
 	models = append(models, friends.Models()...)
 	models = append(models, share.Models()...)
+	models = append(models, ai.Models()...)
 	if err := db.AutoMigrate(models...); err != nil {
 		return err
 	}
