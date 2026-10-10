@@ -1,3 +1,4 @@
+import * as NativeModule from '../../../../modules/lock-engine';
 import type { Settings } from '../../db/schema';
 import { allowedPackages, type LockType } from '../../domain/lock';
 
@@ -26,10 +27,10 @@ export interface LoggedEngineEvent extends LockEngineEvent {
 export interface LockEngine {
   readonly native: boolean;
   startLock(type: LockType, untilEpochMs: number, allowedPackages: string[]): Promise<void>;
-  releaseLock(type: LockType): Promise<void>;
+  releaseLock(type: LockType, by?: NativeModule.ReleasedBy): Promise<void>;
   getLockState(): Promise<NativeLockState[]>;
   /** 설정 + 허용 패키지. 엔진이 앱이 꺼져 있어도 알람으로 잠그도록 일정을 넘긴다. */
-  setSchedule(settings: Settings): Promise<void>;
+  setSchedule(settings: Settings, ignoreStarted?: boolean): Promise<void>;
   /** 끼니를 마감 전에 기록했거나 헬스를 해결했을 때: 그 구간은 앱이 꺼져 있어도 잠기지 않는다. */
   markDone(type: LockType, dayKey: string, index?: number): Promise<void>;
   /** 앱이 꺼져 있는 동안 네이티브가 쌓아 둔 잠금 이벤트 */
@@ -73,9 +74,9 @@ function memoryEngine(): LockEngine {
 // 모듈 모양은 export 방식(named/default)에 상관없이 받는다.
 interface RawModule {
   startLock?: (type: string, until: number, allowed: string[]) => unknown;
-  releaseLock?: (type: string) => unknown;
+  releaseLock?: (type: string, by?: NativeModule.ReleasedBy) => unknown;
   getLockState?: () => unknown;
-  setSchedule?: (settings: unknown) => unknown;
+  setSchedule?: (settings: unknown, options?: { ignoreStarted?: boolean }) => unknown;
   markDone?: (type: string, dayKey: string, index?: number) => unknown;
   drainEventLog?: () => unknown;
   addLockStartedListener?: (cb: (e: LockEngineEvent) => void) => { remove: () => void };
@@ -86,15 +87,8 @@ interface RawModule {
 }
 
 function loadNative(): RawModule | null {
-  try {
-    // Metro는 try/catch 안의 require를 선택적 의존성으로 다룬다. 모듈이 없으면 null.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('../../../modules/lock-engine');
-    const m: RawModule = mod?.default ?? mod;
-    return m && typeof m.startLock === 'function' ? m : null;
-  } catch {
-    return null;
-  }
+  // A static import makes a broken path fail the build instead of silently disabling locking.
+  return NativeModule.isAvailable ? (NativeModule as unknown as RawModule) : null;
 }
 
 function nativeEngine(m: RawModule): LockEngine {
@@ -120,7 +114,7 @@ function nativeEngine(m: RawModule): LockEngine {
   return {
     native: true,
     startLock: (type, until, allowed) => safe(() => m.startLock!(type, until, allowed), undefined),
-    releaseLock: (type) => safe(() => m.releaseLock?.(type), undefined),
+    releaseLock: (type, by = 'action') => safe(() => m.releaseLock?.(type, by), undefined),
     // 모듈은 {locked, locks:[{type, until}]} 로 돌려준다. 어댑터 계약(NativeLockState[])으로 바꾼다.
     getLockState: () =>
       safe(async () => {
@@ -128,8 +122,12 @@ function nativeEngine(m: RawModule): LockEngine {
         if (Array.isArray(st)) return st;
         return (st?.locks ?? []).map((l) => ({ type: l.type, untilEpochMs: l.until }));
       }, [] as NativeLockState[]),
-    setSchedule: (settings) =>
-      safe(() => m.setSchedule?.({ ...settings, allowedPackages: allowedPackages(settings.allowedApps) }), undefined),
+    setSchedule: (settings, ignoreStarted = false) =>
+      safe(async () => {
+        const state = (await m.getLockState?.()) as { hasSchedule?: boolean } | undefined;
+        await m.setSchedule?.({ ...settings, allowedPackages: allowedPackages(settings.allowedApps) },
+          { ignoreStarted: ignoreStarted || state?.hasSchedule === false });
+      }, undefined),
     markDone: (type, dayKey, index) => safe(() => m.markDone?.(type, dayKey, index), undefined),
     drainEventLog: () => safe(() => m.drainEventLog?.(), [] as LoggedEngineEvent[]),
     onLockStarted: (cb) => on('onLockStarted', cb),

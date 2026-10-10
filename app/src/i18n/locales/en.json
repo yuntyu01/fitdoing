@@ -89,7 +89,7 @@
     "locating": "Finding your location",
     "locationDenied": "Location permission is off",
     "locationFailed": "Couldn't find your location. Try again soon",
-    "privacy": "Your location stays on this phone. Coordinates are sent to the device location service (Google) only to look up the address.",
+    "privacy": "Coordinates are saved in the app without sending them for address lookup. Device location services follow your operating system settings and policies.",
     "defaultName": "My gym"
   },
   "sleep": { "title": "Sleep", "bedTime": "Bedtime", "wakeTime": "Wake up" },
@@ -125,6 +125,11 @@
   "weekly": {"title": "Weekly", "avg": "Weekly avg", "target": "Goal", "lastWeek": "Last week", "thisWeek": "This week", "band": "Goal range ±10%", "range": "{{from}} - {{to}}", "achieved": "{{m}} of {{n}} finished days on target", "noneDone": "No finished days yet", "inProgress": "Today", "under": "{{day}}: {{metric}} {{n}}{{unit}} under target", "over": "{{day}}: {{metric}} {{n}}{{unit}} over target", "allIn": "Every finished day was within the target range", "waiting": "Feedback appears once a few days are logged", "avgLine": "This week avg {{avg}} · last week {{last}}"},
   "sync": { "title": "Server sync", "never": "Not yet", "last": "{{time}}", "pending": "{{n}} waiting" },
   "settings": {
+    "support": "Support",
+    "localPhotoNote": "This version saves photos and records in the app. AI analysis, server backup and friend sharing are unavailable. Android automatic backup and device migration are disabled.",
+    "privacyPolicy": "Privacy policy",
+    "serverUnavailable": "No server connection",
+    "localBuildNote": "This test build stores records on your device. AI analysis, backup and sharing with friends require a server and are unavailable in this build.",
     "sectionPlan": "My plan",
     "sectionApp": "App",
     "mealsPerDay": "{{n}} meals a day",
@@ -328,7 +333,7 @@
     "leave": "Stop",
     "barcodeLabel": "Barcode {{code}}",
     "barcodeNote": "We can't look up nutrition from a barcode yet. Please enter it yourself",
-    "photoNote": "The photo stays on this phone. It is only sent, shrunk down, to the server to recognize the food, and the server doesn't keep it.",
+    "photoNote": "This version saves photos in the app without server analysis. You can enter nutrition information manually.",
     "photoNoteShared": "For a meal shared with friends, a shrunk copy of the photo is stored on the server so friends can see it. Log it again without sharing to remove it.",
     "photoNoteBackup": "Photo backup is on, so a shrunk copy of the photo is also stored on the server.",
     "photoNoteBackupShared": "Photo backup is on, so a shrunk copy of the photo is stored on the server, and friends you share with can see it.",
@@ -526,5 +531,24 @@
   "placeholder": {
     "records": "Records are coming soon"
   },
-  "share": {"title": "Share page", "desc": "A page of your meals anyone with the link can view, no login needed. It shows only meals shared with friends, from the last 14 days.", "toggle": "Turn on share page", "toggleDesc": "Turning it off blocks the link right away", "address": "Your page address", "send": "Send link", "open": "Open page", "rotate": "Make a new link", "rotateTitle": "Make a new link?", "rotateBody": "The current link will stop working. You'll need to send the new one.", "note": "Only meals with 'Share with friends' turned on appear. The address is random and can't be guessed.", "failed": "Couldn't change it. Please try again later", "loadFailed": "Couldn't load the share page", "retry": "Try again"}
+  "share": {"title": "Share page", "desc": "A page of your meals anyone with the link can view, no login needed. It shows only meals shared with friends, from the last 14 days.", "toggle": "Turn on share page", "toggleDesc": "Turning it off blocks the link right away", "address": "Your page address", "send": "Send link", "open": "Open page", "rotate": "Make a new link", "rotateTitle": "Make a new link?", "rotateBody": "The current link will stop working. You'll need to send the new one.", "note": "Only meals with 'Share with friends' turned on appear. The address is random and can't be guessed.", "failed": "Couldn't change it. Please try again later", "loadFailed": "Couldn't load the share page", "retry": "Try again"},
+  "lockSetup": {
+    "title": "Lock settings and permissions",
+    "permissions": "Set up app locking",
+    "disclosure": "Restrict other apps at meal deadlines and workout or sleep times. Usage access identifies the app in use; display over other apps shows the lock screen. This is processed on your device. App blocking requires these permissions. An ongoing notification appears while locking is active.",
+    "usageAccess": "Usage access",
+    "usageAccessDesc": "Identify the app currently in use.",
+    "overlay": "Display over other apps",
+    "overlayDesc": "Show the lock screen over a restricted app.",
+    "exactAlarm": "Alarms and reminders",
+    "exactAlarmDesc": "Start locking on schedule even when the app is closed.",
+    "notifications": "Notifications",
+    "notificationsDesc": "Show locking status and deadline reminders.",
+    "allowed": "Allowed",
+    "setup": "Set up",
+    "unavailable": "Native app locking is unavailable in this build.",
+    "openFailed": "Could not open settings. Check FitDoing permissions in Android Settings.",
+    "minutes": "{{n}} minutes",
+    "alwaysAllowed": "Phone, messages, maps, alarms, keyboard and FitDoing stay available. Select any additional apps to allow below."
+  }
 }

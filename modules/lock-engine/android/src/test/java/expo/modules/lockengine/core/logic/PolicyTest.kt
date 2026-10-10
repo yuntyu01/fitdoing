@@ -8,7 +8,7 @@ import org.junit.Test
 
 class BlockPolicyTest {
   private val own = "com.fitdoing.app"
-  private val lock = LockRecord(LockType.MEAL, 0, 10_000, setOf("com.kakao.talk"))
+  private val lock = LockRecord(LockType.MEAL, 0, 10_000, setOf("com.spotify.music"))
   private val base = setOf("com.sec.android.app.launcher")
 
   private fun block(pkg: String?, locks: List<LockRecord> = listOf(lock), user: Set<String> = emptySet()) =
@@ -19,15 +19,16 @@ class BlockPolicyTest {
   @Test fun unknownForegroundNotBlocked() = assertFalse(block(null))
   @Test fun ownAppAllowed() = assertFalse(block(own))
   @Test fun launcherAllowed() = assertFalse(block("com.sec.android.app.launcher"))
+  @Test fun systemSettingsAlwaysRemainAvailable() = assertFalse(block("com.android.settings"))
   @Test fun phoneSmsMapsAlarmAllowedByFallback() {
     listOf("com.samsung.android.dialer", "com.google.android.apps.messaging", "com.nhn.android.nmap", "com.google.android.deskclock")
       .forEach { assertFalse(it, block(it)) }
   }
-  @Test fun perLockAllowedAppPasses() = assertFalse(block("com.kakao.talk"))
+  @Test fun perLockAllowedAppPasses() = assertFalse(block("com.spotify.music"))
   @Test fun userAllowedAppPasses() = assertFalse(block("com.spotify.music", user = setOf("com.spotify.music")))
   @Test fun allActiveLocksMustAllow() {
     val sleep = LockRecord(LockType.SLEEP, 0, 10_000, emptySet())
-    assertTrue(block("com.kakao.talk", listOf(lock, sleep)))
+    assertTrue(block("com.spotify.music", listOf(lock, sleep)))
   }
 }
 
