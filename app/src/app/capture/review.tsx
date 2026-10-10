@@ -25,7 +25,7 @@ import {
   usesFoodPortions,
 } from '../../domain/portion';
 import { fromMinutes, parseDateKey } from '../../domain/time';
-import { analyzeMeal } from '../../features/api/client';
+import { analyzeMeal, lookupBarcode, type BarcodeProduct } from '../../features/api/client';
 import { ItemSheet, type FoodItem } from '../../features/meals/components/ItemSheet';
 import { MealChips } from '../../features/meals/components/MealChips';
 import { NutritionSheet } from '../../features/meals/components/NutritionSheet';
@@ -85,7 +85,9 @@ export default function ReviewScreen() {
 
   // 헤더 아래 "오늘 18:40": 찍은(이 화면을 연) 시각. 수정이면 그 끼니를 기록한 날·시각.
   const [openedAt] = useState(() => new Date(saved?.loggedAt ?? Date.now()));
-  const [phase, setPhase] = useState<Phase>(saved ? 'saved' : photoUri ? 'analyzing' : 'manual');
+  const [phase, setPhase] = useState<Phase>(saved ? 'saved' : photoUri || barcode ? 'analyzing' : 'manual');
+  // 바코드 조회 결과: 찾은 제품 / 등록 안 된 바코드(notFound) / 조회를 못 함(unavailable)
+  const [product, setProduct] = useState<BarcodeProduct | 'notFound' | 'unavailable' | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [shrunk, setShrunk] = useState<string | null>(null);
   const [ai, setAi] = useState<AiResult>(saved?.ai ?? EMPTY_AI);
@@ -130,6 +132,42 @@ export default function ReviewScreen() {
     // shrunk는 첫 실행에서 채워지므로 의존성에서 뺀다. 다시 인식하기는 attempt로만 돌린다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoUri, params.w, params.h, attempt]);
+
+  // 바코드: 찍자마자 제품·영양정보를 찾아 채운다(누를 것 없음). 못 찾으면 직접 입력이나 성분표 사진으로.
+  useEffect(() => {
+    if (!barcode || photoUri || editMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const found = await lookupBarcode(barcode);
+        if (cancelled) return;
+        if (!found) {
+          setProduct('notFound');
+          setPhase('manual');
+          return;
+        }
+        setProduct(found.product);
+        if (found.result) {
+          setAi(found.result);
+          setManualTotals(false);
+          setPhase('done');
+        } else {
+          // 제품은 알지만 영양정보가 없다: 이름만 채워 두고 숫자는 직접
+          setAi({ ...EMPTY_AI, items: [{ name: found.product.name, amount: '' }] });
+          setPhase('manual');
+        }
+      } catch (e) {
+        console.warn('barcode lookup failed', e);
+        if (!cancelled) {
+          setProduct('unavailable');
+          setPhase('manual');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [barcode, photoUri, editMode, attempt]);
 
   const meals = today.meals;
   const chosen = saved ? saved.index : (mealIndex ?? pickMealIndex(meals));
@@ -270,8 +308,25 @@ export default function ReviewScreen() {
           {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" /> : null}
           {barcode ? (
             <View style={styles.related}>
-              <Text style={styles.bodyText}>{t('review.barcodeLabel', { code: barcode })}</Text>
-              <Text style={styles.caption}>{t('review.barcodeNote')}</Text>
+              {product && typeof product === 'object' ? (
+                <>
+                  <Text style={styles.bodyText}>{product.name}</Text>
+                  <Text style={styles.caption}>
+                    {[product.maker, product.amount && t('review.barcodeBasis', { amount: product.amount })]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.bodyText}>{t('review.barcodeLabel', { code: barcode })}</Text>
+                  {product === 'notFound' || product === 'unavailable' ? (
+                    <Text style={styles.caption}>
+                      {t(product === 'notFound' ? 'review.barcodeNotFound' : 'review.barcodeUnavailable')}
+                    </Text>
+                  ) : null}
+                </>
+              )}
             </View>
           ) : null}
         </View>
@@ -283,7 +338,7 @@ export default function ReviewScreen() {
           {analyzing ? (
             <View style={styles.analyzing}>
               <ActivityIndicator color={c.sub} />
-              <Text style={styles.bodySub}>{t('review.analyzing')}</Text>
+              <Text style={styles.bodySub}>{t(barcode && !photoUri ? 'review.lookingUp' : 'review.analyzing')}</Text>
             </View>
           ) : (
             <>

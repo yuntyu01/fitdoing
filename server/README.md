@@ -44,6 +44,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `GEMINI_MODEL`은 모든 사용자의 기본 모델. `gemini-2.5-flash`는 이제 404 |
 | `GEMINI_MODELS` | - | (선택) 관리자가 지정할 수 있는 모델을 더할 때만. 기본으로 `gemini-3.5-flash-lite`·`gemini-3.8-flash`는 설정 없이 지정할 수 있다(`platform.BuiltinGeminiModels`) |
 | `KAKAO_REST_API_KEY` | - | (선택) 카카오 개발자 콘솔의 같은 앱 REST API 키. 헬스장 장소 검색(`/api/places/search`). 비우면 검색은 503, 앱은 '지금 위치로 설정'만 보인다 |
+| `FOODSAFETY_API_KEY`, `DATA_GO_KR_API_KEY` | - | (선택, 둘 다) 바코드 → 제품·영양정보. 식품안전나라 오픈API 키(C005 바코드제품정보)와 공공데이터포털 키(식품의약품안전처_식품영양성분DB정보). 비우면 바코드 조회는 503, 앱은 바코드 번호만 남긴다 |
 | `ADMIN_PASSWORD` | - | 10자 이상이면 관리자 페이지 `/admin`과 API를 켠다. 비우면 둘 다 404. 바꾸면 기존 관리자 로그인이 모두 풀린다 |
 | `ZONE` | `Asia/Seoul` | 서버 기준 시간대(강도 변경 적용일 등) |
 | `CORS_ORIGINS` | `*` | 쉼표로 구분한 허용 출처. 웹 미리보기용 |
@@ -65,6 +66,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 - `ai.FoodAnalyzer` 인터페이스. `AI_PROVIDER=mock`(기본, 사진 해시로 고른 고정 샘플) | `gemini`.
 - Gemini: `generateContent`에 사진을 `inline_data`(base64)로 보내고 `responseSchema`로 JSON을 고정한다. 키는 서버에만 둔다. 실패하면 502 `AI_FAILED`.
 - 음식마다 칼로리·탄단지를 받고(`items[].kcal/carbs/protein/fat`), 끼니 합계는 서버가 더한다. 응답은 숫자 누락·범위(`Result.Validate`)를 검사해서 어기면 `AI_FAILED`. 음식별 값은 `meal_items`에 저장되고(직접 입력한 음식은 null), 끼니 합계는 `meal_logs`가 기준이다.
+- 영양성분표 사진도 같은 분석으로 받는다: 표의 숫자를 그대로 옮기고(추정하지 않음) 양에 표의 기준(총 내용량·1회 제공량·100g당)을 적는다.
 - 사진은 저장하지 않는다(메모리에서만 처리, 디스크에 쓰지 않음). 결과 JSON만 돌려준다: `{items:[{name, amount}], kcal, carbs, protein, fat, confidence}`
 - 사진 5MB 초과 413 `PHOTO_TOO_LARGE`, 이미지가 아니면 400 `INVALID_PHOTO`.
 - 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + 기본 목록(`gemini-3.5-flash-lite`, `gemini-3.8-flash`) + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
@@ -100,6 +102,7 @@ curl -b admin.jar https://<서버>/api/admin/users
 | DELETE `/api/account` | 회원 탈퇴: 계정과 모든 기록 삭제, 204 |
 | GET `/api/targets/recommend?goal=&weightKg=[&heightCm=&age=&sex=&activity=&mode=]` | 목표 추천 (로그인 불필요). 구형 요청(goal·weightKg만)은 예전 체중 기반 값 그대로, 신체 정보를 함께 보내면 2025 KDRI 성인 EER 기반(유지 추정 `maintenanceKcal`과 목표 분리). docs/nutrition-targets.md |
 | GET `/api/places/search?q=&lat=&lng=` | 헬스장 이름으로 장소 검색(카카오 로컬 키워드 검색 대리 호출, 로그인 필요). `lat`·`lng`를 주면 가까운 순. `{places:[{name, address(도로명 우선), lat, lng, category, distanceM}]}`. 키 없음 503 `PLACES_UNAVAILABLE`, 카카오 오류 502 `PLACES_FAILED` |
+| GET `/api/foods/barcode/{code}` | 바코드(숫자 8~14자리)로 제품을 찾는다(로그인 필요). C005 로 품목제조보고번호를 얻고 식품영양성분DB에서 영양값을 가져와 1회 섭취참고량(없으면 제품 중량, 없으면 DB 기준량) 기준으로 맞춘다. `{product:{name, maker, reportNo, amount}, result:(사진 분석과 같은 모양) \| null}`. 없는 바코드 404 `BARCODE_NOT_FOUND`, 키 없음 503 |
 | POST `/api/meals/analyze` (multipart `photo`) | 음식 인식 (로그인 필요, 유료 호출) |
 | POST/GET/DELETE `/api/meals` | 끼니 기록(같은 끼니는 덮어쓰기, portion 0.25/0.5/1/1.5/2, 열린 끼니 잠금 해제) |
 | GET `/api/today?date=&time=` | 홈: 합계·식단 표·연속 기록·헬스 주간·쿠폰. `time`(폰 현지 `HH:mm`, 선택)을 주면 마감이 지난 미기록 끼니는 `missed`, 남은 끼니 `target`은 오늘 남은 양 ÷ 남은 끼니 수 |

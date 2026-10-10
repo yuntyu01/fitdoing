@@ -15,6 +15,7 @@ import (
 	"github.com/yuntyu01/fitdoing/server/internal/ai"
 	"github.com/yuntyu01/fitdoing/server/internal/api"
 	"github.com/yuntyu01/fitdoing/server/internal/auth"
+	"github.com/yuntyu01/fitdoing/server/internal/foods"
 	"github.com/yuntyu01/fitdoing/server/internal/photo"
 	"github.com/yuntyu01/fitdoing/server/internal/places"
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
@@ -69,6 +70,7 @@ func run() error {
 			AIModels:      models,
 			AdminPassword: cfg.AdminPassword,
 			Places:        places.New(cfg.KakaoRESTKey, cfg.KakaoLocalURL),
+			Foods:         foods.New(cfg.FoodSafetyKey, cfg.DataGoKrKey, cfg.FoodSafetyURL, cfg.DataGoKrURL),
 			PhotoStore:    photoStore(cfg),
 			PublicURL:     cfg.PublicURL,
 		}),
@@ -83,7 +85,8 @@ func run() error {
 		_ = srv.Shutdown(ctx)
 	}()
 	slog.Info("listening", "addr", srv.Addr, "db", cfg.DBDriver, "ai", cfg.AIProvider, "models", names,
-		"admin", cfg.AdminPassword != "", "places", cfg.KakaoRESTKey != "")
+		"admin", cfg.AdminPassword != "", "places", cfg.KakaoRESTKey != "",
+		"barcode", cfg.FoodSafetyKey != "" && cfg.DataGoKrKey != "")
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

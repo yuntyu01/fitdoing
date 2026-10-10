@@ -28,6 +28,10 @@ type Config struct {
 	KakaoAppID      string   // Kakao app id (numeric); access tokens of other apps are refused
 	KakaoRESTKey    string   // KAKAO_REST_API_KEY: Kakao Local place search for the gym ("" = search off)
 	KakaoLocalURL   string   // KAKAO_LOCAL_URL: (tests) replaces https://dapi.kakao.com
+	FoodSafetyKey   string   // FOODSAFETY_API_KEY: 식품안전나라 open API key (barcode -> product)
+	DataGoKrKey     string   // DATA_GO_KR_API_KEY: 공공데이터포털 key (식품영양성분DB). Both needed for barcode lookup
+	FoodSafetyURL   string   // (tests) replaces http://openapi.foodsafetykorea.go.kr
+	DataGoKrURL     string   // (tests) replaces https://apis.data.go.kr
 	KakaoInfoURL    string   // token-info endpoint of Kakao; only a test double differs from the default
 	AuthDisabled    bool     // AUTH_DISABLED=1: every Bearer token is accepted as one fixed dev user (development only)
 
@@ -56,6 +60,7 @@ const defaultPostgresDSN = "host=localhost user=fitdoing password=fitdoing dbnam
 //	APPLE_CLIENT_ID    Apple audience (default com.fitdoing.app)
 //	KAKAO_APP_ID       numeric Kakao app id
 //	KAKAO_REST_API_KEY (optional) REST API key of the same Kakao app: gym place search (/api/places/search)
+//	FOODSAFETY_API_KEY, DATA_GO_KR_API_KEY (optional, both) barcode -> product nutrition (/api/foods/barcode/{code})
 //	KAKAO_TOKEN_INFO_URL  (optional) replaces Kakao's token-info URL, for end-to-end tests with a fake Kakao
 //	GEMINI_MODELS      (optional) comma separated models to add to BuiltinGeminiModels; GEMINI_MODEL stays the default
 //	ADMIN_PASSWORD     (optional, 10+ chars) enables the admin page /admin and its API
@@ -105,6 +110,10 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	c.KakaoAppID = strings.TrimSpace(getenv("KAKAO_APP_ID"))
 	c.KakaoRESTKey = strings.TrimSpace(getenv("KAKAO_REST_API_KEY"))
 	c.KakaoLocalURL = strings.TrimSpace(getenv("KAKAO_LOCAL_URL"))
+	c.FoodSafetyKey = strings.TrimSpace(getenv("FOODSAFETY_API_KEY"))
+	c.DataGoKrKey = strings.TrimSpace(getenv("DATA_GO_KR_API_KEY"))
+	c.FoodSafetyURL = strings.TrimSpace(getenv("FOODSAFETY_URL"))
+	c.DataGoKrURL = strings.TrimSpace(getenv("DATA_GO_KR_URL"))
 	c.KakaoInfoURL = strings.TrimSpace(getenv("KAKAO_TOKEN_INFO_URL"))
 	for _, id := range strings.Split(getenv("GOOGLE_CLIENT_IDS"), ",") {
 		if id = strings.TrimSpace(id); id != "" {

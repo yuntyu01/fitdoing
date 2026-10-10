@@ -99,6 +99,45 @@ export async function analyzeMeal(photoUri: string): Promise<AiResult> {
   };
 }
 
+export interface BarcodeProduct {
+  name: string;
+  maker: string;
+  /** 영양값의 기준 양 (예: "1회 섭취참고량 30g") */
+  amount: string;
+}
+
+/**
+ * 바코드로 제품·영양정보를 찾는다(식품안전나라 + 식품영양성분DB, 서버 경유).
+ * 없으면 null(404). 서버에 조회 키가 없거나 실패하면 ApiError 를 던진다.
+ * result 는 사진 분석과 같은 모양이고, 제품은 알지만 영양정보가 없으면 null.
+ */
+export async function lookupBarcode(
+  code: string,
+): Promise<{ product: BarcodeProduct; result: AiResult | null } | null> {
+  let res: Response;
+  try {
+    res = await request(`/api/foods/barcode/${encodeURIComponent(code)}`, { method: 'GET' }, ANALYZE_TIMEOUT_MS);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+  const data = (await res.json()) as { product: BarcodeProduct; result: Partial<AiResult> | null };
+  const r = data.result;
+  return {
+    product: data.product,
+    result: r
+      ? {
+          items: Array.isArray(r.items) ? r.items.map(sanitizeItem) : [],
+          kcal: Number(r.kcal) || 0,
+          carbs: Number(r.carbs) || 0,
+          protein: Number(r.protein) || 0,
+          fat: Number(r.fat) || 0,
+          confidence: Number(r.confidence) || 0,
+        }
+      : null,
+  };
+}
+
 // ---- 로그인·계정 ----
 
 /** 카카오·구글·애플에서 받은 토큰을 서버에 보내 우리 로그인 토큰을 받는다. */
