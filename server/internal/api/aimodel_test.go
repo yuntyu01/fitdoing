@@ -151,3 +151,24 @@ func TestAssignedModelRemovedFromConfig(t *testing.T) {
 	r.eq(t, "users.0.aiModel", "gemini-3.8-flash") // still stored, shown to the admin
 	r.eq(t, "users.0.effectiveModel", "gemini-3.5-flash-lite")
 }
+
+func TestAdminPage(t *testing.T) {
+	e := newModelEnv(t, adminToken, "gemini-3.5-flash-lite", "gemini-3.8-flash")
+	for path, ct := range map[string]string{"/admin": "text/html", "/admin/admin.js": "text/javascript", "/admin/admin.css": "text/css"} {
+		rec := httptest.NewRecorder()
+		e.srv.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), ct) ||
+			!strings.Contains(rec.Header().Get("Content-Security-Policy"), "script-src 'self'") {
+			t.Fatalf("%s: %d %v", path, rec.Code, rec.Header())
+		}
+		if strings.Contains(rec.Body.String(), adminToken) {
+			t.Fatal("the page must not carry the token")
+		}
+	}
+	off := newModelEnv(t, "", "gemini-3.5-flash-lite")
+	rec := httptest.NewRecorder()
+	off.srv.ServeHTTP(rec, httptest.NewRequest("GET", "/admin", nil))
+	if rec.Code != 404 {
+		t.Fatalf("admin page without ADMIN_TOKEN: %d", rec.Code)
+	}
+}

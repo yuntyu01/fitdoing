@@ -5,6 +5,7 @@ package admin
 
 import (
 	"crypto/subtle"
+	"embed"
 	"net/http"
 	"strconv"
 	"time"
@@ -37,7 +38,39 @@ type UserRow struct {
 	Effective string    `json:"effectiveModel"` // what the analyze call uses now
 }
 
+//go:embed web
+var web embed.FS
+
+// page serves one file of the admin page (/admin). The page holds no data or secret: it asks for the token and
+// calls the API. Without ADMIN_TOKEN configured it is 404 like the API.
+func page(token, name, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if token == "" {
+			http.NotFound(w, r)
+			return
+		}
+		b, err := web.ReadFile("web/" + name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		h := w.Header()
+		h.Set("Content-Type", contentType)
+		h.Set("Cache-Control", "no-store")
+		h.Set("X-Robots-Tag", "noindex, nofollow")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+		_, _ = w.Write(b)
+	}
+}
+
 func Register(mux *http.ServeMux, db *gorm.DB, token string, models *ai.ModelSet) {
+	mux.HandleFunc("GET /admin", page(token, "index.html", "text/html; charset=utf-8"))
+	mux.HandleFunc("GET /admin/admin.js", page(token, "admin.js", "text/javascript; charset=utf-8"))
+	mux.HandleFunc("GET /admin/admin.css", page(token, "admin.css", "text/css; charset=utf-8"))
+
 	mux.HandleFunc("GET /api/admin/ai-models", guard(token, func(w http.ResponseWriter, r *http.Request) error {
 		platform.JSON(w, http.StatusOK, map[string]any{"default": models.Default(), "allowed": models.Allowed()})
 		return nil

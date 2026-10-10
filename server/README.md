@@ -69,6 +69,8 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 - 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + 기본 목록(`gemini-3.5-flash-lite`, `gemini-3.8-flash`) + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
 
 ## 관리자 API (`X-Admin-Token: <ADMIN_TOKEN>`, 사용자 로그인과 별개)
+관리자 페이지: 브라우저로 `https://<서버>/admin` 을 열고 ADMIN_TOKEN 을 붙여 넣으면 사용자 목록과 사용자별 AI 모델 선택이 보인다. 토큰은 그 탭의 sessionStorage 에만 둔다. ADMIN_TOKEN 이 없으면 페이지도 404.
+
 | | |
 |---|---|
 | GET `/api/admin/ai-models` | `{default, allowed[]}` |
