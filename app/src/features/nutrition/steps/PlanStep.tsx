@@ -285,6 +285,6 @@ const styles = StyleSheet.create({
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
-    label: { ...text.label, color: c.text },
+    label: { ...text.label, color: c.text, flexShrink: 1 },
     foldTitle: { ...text.heading, fontFamily: fonts.semibold, color: c.text },
   });
