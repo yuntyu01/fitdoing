@@ -125,6 +125,9 @@
   "weekly": {"title": "주간 그래프", "avg": "주 평균", "target": "목표", "lastWeek": "지난주", "thisWeek": "이번 주", "band": "목표 범위 ±10%", "range": "{{from}} - {{to}}", "achieved": "완료한 {{n}}일 중 {{m}}일 달성", "noneDone": "아직 완료한 날이 없어요", "inProgress": "진행 중", "under": "{{day}}은 {{metric}} 목표보다 {{n}}{{unit}} 적었어요", "over": "{{day}}은 {{metric}} 목표보다 {{n}}{{unit}} 많았어요", "allIn": "완료한 날은 모두 목표 범위 안이에요", "waiting": "지난 날 기록이 쌓이면 여기에서 알려 드려요", "avgLine": "이번 주 평균 {{avg}} · 지난주 {{last}}"},
   "sync": { "title": "서버 동기화", "never": "아직 안 함", "last": "{{time}}", "pending": "대기 {{n}}건" },
   "settings": {
+    "support": "고객지원",
+    "serverUnavailable": "서버 미연결",
+    "localBuildNote": "이 테스트 버전은 기기에 기록을 저장해요. 서버 연결이 필요한 AI 분석·백업·친구 공유는 사용할 수 없어요.",
     "sectionPlan": "내 계획",
     "sectionApp": "앱 설정",
     "mealsPerDay": "하루 {{n}}끼",

@@ -125,6 +125,9 @@
   "weekly": {"title": "Weekly", "avg": "Weekly avg", "target": "Goal", "lastWeek": "Last week", "thisWeek": "This week", "band": "Goal range ±10%", "range": "{{from}} - {{to}}", "achieved": "{{m}} of {{n}} finished days on target", "noneDone": "No finished days yet", "inProgress": "Today", "under": "{{day}}: {{metric}} {{n}}{{unit}} under target", "over": "{{day}}: {{metric}} {{n}}{{unit}} over target", "allIn": "Every finished day was within the target range", "waiting": "Feedback appears once a few days are logged", "avgLine": "This week avg {{avg}} · last week {{last}}"},
   "sync": { "title": "Server sync", "never": "Not yet", "last": "{{time}}", "pending": "{{n}} waiting" },
   "settings": {
+    "support": "Support",
+    "serverUnavailable": "No server connection",
+    "localBuildNote": "This test build stores records on your device. AI analysis, backup and sharing with friends require a server and are unavailable in this build.",
     "sectionPlan": "My plan",
     "sectionApp": "App",
     "mealsPerDay": "{{n}} meals a day",

@@ -2,10 +2,11 @@ import { router, type Href } from 'expo-router';
 import { ChevronRight, UserRound } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatNumber } from '../../domain/format';
+import { SERVER_CONFIGURED } from '../../features/api/client';
 import { useSyncStatus } from '../../features/api/store';
 import { deleteAccountAndData, logout } from '../../features/auth/account';
 import { AUTH_DISABLED } from '../../features/auth/session';
@@ -87,6 +88,10 @@ export default function SettingsScreen() {
         ? t('sync.last', { time: formatDateTime(lastSyncAt) })
         : t('sync.never');
   const go = (href: Href) => () => router.push(href);
+  const openSupport = () => {
+    void Linking.openURL('https://midi-broccoli-56c.notion.site/FitDoing-3f4502846708812981c9db286d1eef63')
+      .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
+  };
 
   const confirmLogout = () =>
     Alert.alert(t('settings.logoutTitle'), t('settings.logoutBody'), [
@@ -195,7 +200,11 @@ export default function SettingsScreen() {
             label={t('settings.photoBackup')}
             right={<Toggle value={s.photoBackup} onChange={(photoBackup) => update({ photoBackup })} />}
           />
-          <ListRow disabled label={t('sync.title')} value={syncValue} />
+          <ListRow disabled label={t('sync.title')} value={SERVER_CONFIGURED ? syncValue : t('settings.serverUnavailable')} />
+        </Section>
+
+        <Section title={t('settings.support')} note={SERVER_CONFIGURED ? undefined : t('settings.localBuildNote')}>
+          <ListRow label={t('settings.support')} value="yuntyu01@gmail.com" onPress={openSupport} />
         </Section>
 
         {/* 로그인 없는 빌드(비공개 테스트)에는 로그아웃할 계정이 없다: 누르면 로그인 화면에 갇힌다 */}
