@@ -30,7 +30,6 @@ export default function EditProfile() {
   return (
     <Screen
       header={<SubHeader title={t('settings.myProfile')} onBack={() => router.back()} />}
-      desc={t('edit.profileTargetsNote')}
       footer={
         <FullButton
           label={t('edit.save')}
@@ -54,6 +53,7 @@ export default function EditProfile() {
         value={p}
         onChange={setP}
         goalTitle={t('edit.goal')}
+        bodyNote={t('edit.profileTargetsNote')}
         nickname={{ value: nickname, onChange: setNickname, title: t('edit.nickname') }}
       />
     </Screen>

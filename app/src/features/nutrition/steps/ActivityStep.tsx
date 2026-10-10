@@ -1,14 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
-import {
-  ACTIVITIES,
-  PA,
-  PAL_RANGE,
-  type DailyActivity,
-  type ExerciseType,
-  type Intensity,
-} from '../../../domain/nutrition';
+import { ACTIVITIES, type DailyActivity, type ExerciseType, type Intensity } from '../../../domain/nutrition';
 import { NumberField } from '../../../ui/NumberField';
 import { Segmented } from '../../../ui/Segmented';
 import { layout } from '../../../ui/tokens';
@@ -30,8 +23,6 @@ export function ActivityStep() {
   const ai = f.activityInput;
   const ex = ai.exercise;
   const setEx = (p: Partial<typeof ex>) => set({ ...f, activityInput: { ...ai, exercise: { ...ex, ...p } } });
-  const paOf = (a: (typeof ACTIVITIES)[number]) =>
-    f.sex ? String(PA[f.sex][a].toFixed(2)) : `${PA.male[a].toFixed(2)} / ${PA.female[a].toFixed(2)}`;
 
   return (
     <View style={styles.root}>
@@ -102,7 +93,7 @@ export function ActivityStep() {
             <RadioRow
               key={a}
               label={t(`activity.${a}`)}
-              desc={`${t(`activityDesc.${a}`)}\n${t('nutrition.levelMeta', { pal: PAL_RANGE[a], pa: paOf(a) })}`}
+              desc={t(`activityDesc.${a}`)}
               selected={f.activity === a}
               onPress={() => set({ ...f, activity: a })}
             />

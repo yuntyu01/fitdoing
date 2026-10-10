@@ -23,16 +23,9 @@
   "weekdayLong": { "0": "Monday", "1": "Tuesday", "2": "Wednesday", "3": "Thursday", "4": "Friday", "5": "Saturday", "6": "Sunday" },
   "date": { "full": "{{weekday}}, {{month}}/{{day}}" },
   "goal": { "lose": "Cut (lose)", "keep": "Keep", "gain": "Lean bulk (slow gain)", "bulk": "Bulk (fast gain)" },
-  "goalDesc": {
-    "lose": "Eat below your maintenance estimate",
-    "keep": "Hold your current weight",
-    "gain": "Eat a little above maintenance",
-    "bulk": "Eat well above maintenance"
-  },
   "sex": {
     "male": "Male",
-    "female": "Female",
-    "unset": "Not set"
+    "female": "Female"
   },
   "activity": {
     "sedentary": "Sedentary",
@@ -42,7 +35,7 @@
   },
   "activityDesc": {
     "sedentary": "Mostly sitting, no exercise",
-    "low": "Daily life plus some light walking or exercise (most Korean adults)",
+    "low": "Some light walking or exercise (most Korean adults)",
     "active": "Quite a lot of walking or exercise each day",
     "veryActive": "Long hours of hard training or physical work"
   },
@@ -84,15 +77,14 @@
     "title": "Nutrition targets",
     "step1": "Body and goal",
     "step2": "Daily activity and exercise",
-    "step2Desc": "Describe your day, then pick your activity level yourself.",
     "step3": "How to calculate",
     "step4": "Review",
     "step4Desc": "Check the maintenance estimate and the target, then apply. Your current target stays until you apply.",
     "apply": "Apply this target",
     "seeResult": "See result",
-    "bodyNote": "Leave sex or age empty and only custom targets are available.",
+    "bodyNote": "If you don't pick a sex or leave age empty, only custom targets are available.",
     "scopeTitle": "Who the auto calculation is for",
-    "scopeNote": "The automatic calculation is for adults 19 and over. If any of these apply, or you are under 19, the general adult calculation is not used and only custom targets open. Set targets with your care team.",
+    "scopeNote": "Under 19, or if any of these apply, only custom targets are used instead of the adult calculation. Set targets with your care team.",
     "special": {
       "pregnant": "Pregnant",
       "lactating": "Breastfeeding",
@@ -124,8 +116,7 @@
       "vigorous": "Vigorous"
     },
     "levelTitle": "Confirm activity level",
-    "levelNote": "Use the above as a guide and pick for your whole day including exercise. There is no validated rule that sets the level from workout counts, so the app does not pick it for you. Because your exercise is in this level, its calories are not added to your meal target again.",
-    "levelMeta": "PAL {{pal}} · coefficient {{pa}}",
+    "levelNote": "Pick your usual day including exercise. Exercise is part of the level, so its calories are not added again.",
     "modeTitle": "Nutrition target",
     "modeBlocked": "The automatic calculation does not apply, so only custom targets are available.",
     "mode": {
@@ -134,16 +125,16 @@
       "custom": "Custom"
     },
     "modeDesc": {
-      "balanced": "Split by share of calories. Starts at carbs 55 · protein 20 · fat 25%",
-      "training": "Set protein by body weight (g/kg) first, then split the rest",
+      "balanced": "Starts at carbs 55 · protein 20 · fat 25%",
+      "training": "Protein set by body weight first",
       "custom": "Set the ratio or grams yourself"
     },
     "adjustTitle": "Goal adjustment",
-    "adjustNote": "The app's starting value for {{goal}} is {{start}}. It is an app policy, not an official recommendation, and you can change it.",
+    "adjustNote": "The starting value {{start}} for {{goal}} is an app choice (not an official recommendation). You can change it.",
     "balancedTitle": "Share of calories",
-    "balancedNote": "A starting point picked by the app, not the one official ratio.",
+    "balancedNote": "A starting ratio picked by the app, not the one official ratio.",
     "trainingTitle": "Protein and fat",
-    "trainingNote": "Starting values are app choices (lose 2.0 · keep 1.6 · lean bulk/bulk 1.8 g/kg, fat 25%). For reference, ISSN (2017) gives 1.4–2.0 g/kg/day for most exercising people. Carbs fill the remaining calories.",
+    "trainingNote": "Starting values are app choices. For reference, ISSN (2017) gives 1.4–2.0 g/kg/day for exercising people.",
     "proteinPerKg": "Protein",
     "fatPct": "Fat",
     "customTitle": "Custom",

@@ -33,7 +33,6 @@ export function isProfileValid(p: ProfileDraft): boolean {
 export const ageOf = (p: ProfileDraft): number | null => (p.age.trim() === '' ? null : Number(p.age));
 
 const GOALS: Goal[] = ['lose', 'keep', 'gain', 'bulk'];
-type SexChoice = Sex | 'unset';
 
 interface Props {
   value: ProfileDraft;
@@ -46,13 +45,13 @@ interface Props {
   nickname?: { value: string; onChange: (v: string) => void; title: string };
 }
 
-/** 목표(하나 고르기) + 성별·나이·키·몸무게 + 닉네임(선택) */
+/** 목표(하나 고르기) + 성별 + 키·몸무게(한 줄) + 나이(다음 줄) + 닉네임(선택) */
 export function ProfileEditor({ value, onChange, goalTitle, bodyNote, nickname }: Props) {
   const { t } = useTranslation();
-  const sexOptions: { value: SexChoice; label: string }[] = [
+  // 성별은 남성·여성 중 고른다. 아직 안 골랐으면(null) 둘 다 꺼진 채로 둔다(그때는 직접 설정만 쓸 수 있다).
+  const sexOptions: { value: Sex; label: string }[] = [
     { value: 'male', label: t('sex.male') },
     { value: 'female', label: t('sex.female') },
-    { value: 'unset', label: t('sex.unset') },
   ];
   return (
     <View style={styles.root}>
@@ -62,7 +61,6 @@ export function ProfileEditor({ value, onChange, goalTitle, bodyNote, nickname }
             <RadioRow
               key={g}
               label={t(`goal.${g}`)}
-              desc={t(`goalDesc.${g}`)}
               selected={value.goal === g}
               onPress={() => onChange({ ...value, goal: g })}
             />
@@ -73,22 +71,12 @@ export function ProfileEditor({ value, onChange, goalTitle, bodyNote, nickname }
         <View style={styles.fields}>
           <Segmented
             options={sexOptions}
-            value={value.sex ?? 'unset'}
-            onChange={(v) => onChange({ ...value, sex: v === 'unset' ? null : v })}
+            value={value.sex ?? ('' as Sex)}
+            onChange={(sex) => onChange({ ...value, sex })}
           />
           <View style={styles.row}>
             <View style={styles.field}>
               <NumberField
-                compact
-                label={t('onboarding.age')}
-                unit={t('onboarding.ageUnit')}
-                value={value.age}
-                onChange={(age) => onChange({ ...value, age: age.replace(/\./g, '') })}
-              />
-            </View>
-            <View style={styles.field}>
-              <NumberField
-                compact
                 label={t('onboarding.height')}
                 unit={t('onboarding.cm')}
                 value={value.height}
@@ -97,7 +85,6 @@ export function ProfileEditor({ value, onChange, goalTitle, bodyNote, nickname }
             </View>
             <View style={styles.field}>
               <NumberField
-                compact
                 label={t('onboarding.weight')}
                 unit={t('onboarding.kg')}
                 value={value.weight}
@@ -105,6 +92,12 @@ export function ProfileEditor({ value, onChange, goalTitle, bodyNote, nickname }
               />
             </View>
           </View>
+          <NumberField
+            label={t('onboarding.age')}
+            unit={t('onboarding.ageUnit')}
+            value={value.age}
+            onChange={(age) => onChange({ ...value, age: age.replace(/\./g, '') })}
+          />
         </View>
       </FormSection>
       {nickname ? (

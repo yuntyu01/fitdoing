@@ -97,7 +97,6 @@ export function ActivityScreen({ flow }: { flow: Flow }) {
     <Screen
       header={<Header flow={flow} i={2} />}
       title={t('nutrition.step2')}
-      desc={t('nutrition.step2Desc')}
       footer={<FullButton label={t('common.next')} onPress={() => router.push(flow.next.plan)} />}
     >
       <ActivityStep />

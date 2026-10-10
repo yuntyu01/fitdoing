@@ -212,22 +212,21 @@ export default function ReviewScreen() {
   const perFood = plan.perFood;
   const nutrition = useMemo(() => applyPortion(plan.ai, plan.portion, shared), [plan, shared]);
 
-  const setItem = useCallback(
-    (item: FoodItem) => {
-      setAi((p) => {
-        const items = [...p.items];
-        if (editing?.at == null) items.push(item);
-        else {
-          // 이름이 같으면(양만 고침) AI가 추정한 음식별 칼로리·탄단지·먹은 양을 남기고, 다른 음식으로 바꾸면 버린다
-          const prev = items[editing.at];
-          items[editing.at] = prev && prev.name === item.name ? { ...prev, ...item } : item;
-        }
-        return { ...p, items };
-      });
-      setEditing(null);
-    },
-    [editing],
-  );
+  // 메모는 React Compiler 에 맡긴다(직접 useCallback 으로 감싸면 컴파일러가 이 화면을 최적화하지 못한다)
+  const setItem = (item: FoodItem) => {
+    const at = editing?.at;
+    setAi((p) => {
+      const items = [...p.items];
+      if (at == null) items.push(item);
+      else {
+        // 이름이 같으면(양만 고침) AI가 추정한 음식별 칼로리·탄단지·먹은 양을 남기고, 다른 음식으로 바꾸면 버린다
+        const prev = items[at];
+        items[at] = prev && prev.name === item.name ? { ...prev, ...item } : item;
+      }
+      return { ...p, items };
+    });
+    setEditing(null);
+  };
 
   const removeItem = () => {
     const at = editing?.at;

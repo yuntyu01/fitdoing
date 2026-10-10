@@ -10,7 +10,7 @@ import type { Targets } from '../../domain/targets';
 import { TotalsCard } from '../today/components/TotalsCard';
 import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
 import { fonts, layout, radius, text } from '../../ui/tokens';
-import { clock, eatenFoodNames, fullDate, kcalText, macroText, type MealRow } from './format';
+import { clock, eatenFoodNames, fullDate, type MealRow } from './format';
 
 const THUMB = 60;
 
