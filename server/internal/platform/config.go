@@ -17,7 +17,7 @@ type Config struct {
 	AIProvider  string // mock | gemini
 	GeminiKey   string
 	GeminiModel string   // default model for every user
-	GeminiExtra []string // GEMINI_MODELS: more models an admin may assign per user (comma separated)
+	GeminiExtra []string // models an admin may assign per user besides the default: BuiltinGeminiModels + GEMINI_MODELS
 	AdminToken  string   // ADMIN_TOKEN: X-Admin-Token of /api/admin/* (32+ chars); "" = admin API off
 	Zone        *time.Location
 	CORSOrigins []string
@@ -38,6 +38,10 @@ type Config struct {
 	R2SecretKey string
 }
 
+// BuiltinGeminiModels are the models an admin can assign per user without any configuration (besides
+// GEMINI_MODEL, the default). IDs from ai.google.dev/gemini-api/docs/models.
+var BuiltinGeminiModels = []string{"gemini-3.5-flash-lite", "gemini-3.8-flash"}
+
 const defaultPostgresDSN = "host=localhost user=fitdoing password=fitdoing dbname=fitdoing port=5432 sslmode=disable"
 
 // LoadConfig builds a Config from getenv (os.Getenv in production).
@@ -50,7 +54,7 @@ const defaultPostgresDSN = "host=localhost user=fitdoing password=fitdoing dbnam
 //	APPLE_CLIENT_ID    Apple audience (default com.fitdoing.app)
 //	KAKAO_APP_ID       numeric Kakao app id
 //	KAKAO_TOKEN_INFO_URL  (optional) replaces Kakao's token-info URL, for end-to-end tests with a fake Kakao
-//	GEMINI_MODELS      (optional) comma separated extra models an admin can assign per user; GEMINI_MODEL stays the default
+//	GEMINI_MODELS      (optional) comma separated models to add to BuiltinGeminiModels; GEMINI_MODEL stays the default
 //	ADMIN_TOKEN        (optional, 32+ chars) enables the admin API (X-Admin-Token header)
 func LoadConfig(getenv func(string) string) (Config, error) {
 	env := func(k, def string) string {
@@ -65,7 +69,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		GeminiKey:   getenv("GEMINI_API_KEY"),
 		GeminiModel: env("GEMINI_MODEL", "gemini-3.5-flash-lite"),
 	}
-	for _, m := range strings.Split(getenv("GEMINI_MODELS"), ",") {
+	for _, m := range append(BuiltinGeminiModels, strings.Split(getenv("GEMINI_MODELS"), ",")...) {
 		if m = strings.TrimSpace(m); m != "" && m != c.GeminiModel && !slices.Contains(c.GeminiExtra, m) {
 			c.GeminiExtra = append(c.GeminiExtra, m)
 		}

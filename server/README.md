@@ -42,7 +42,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `DB_DRIVER` | 자동 | `postgres` \| `sqlite` (`DB_URL`로 추론, 둘 다 없으면 postgres) |
 | `AI_PROVIDER` | `mock` | `mock` \| `gemini` |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `GEMINI_MODEL`은 모든 사용자의 기본 모델. `gemini-2.5-flash`는 이제 404 |
-| `GEMINI_MODELS` | - | 관리자가 사용자별로 지정할 수 있는 추가 모델(쉼표 구분, 예: `gemini-3.8-flash`). 정확한 모델 ID는 Google AI Studio에서 확인 |
+| `GEMINI_MODELS` | - | (선택) 관리자가 지정할 수 있는 모델을 더할 때만. 기본으로 `gemini-3.5-flash-lite`·`gemini-3.8-flash`는 설정 없이 지정할 수 있다(`platform.BuiltinGeminiModels`) |
 | `ADMIN_TOKEN` | - | 32자 이상이면 관리자 API(`/api/admin/*`, 헤더 `X-Admin-Token`)를 켠다. 비우면 관리자 API는 404 |
 | `ZONE` | `Asia/Seoul` | 서버 기준 시간대(강도 변경 적용일 등) |
 | `CORS_ORIGINS` | `*` | 쉼표로 구분한 허용 출처. 웹 미리보기용 |
@@ -66,7 +66,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 - 음식마다 칼로리·탄단지를 받고(`items[].kcal/carbs/protein/fat`), 끼니 합계는 서버가 더한다. 응답은 숫자 누락·범위(`Result.Validate`)를 검사해서 어기면 `AI_FAILED`. 음식별 값은 `meal_items`에 저장되고(직접 입력한 음식은 null), 끼니 합계는 `meal_logs`가 기준이다.
 - 사진은 저장하지 않는다(메모리에서만 처리, 디스크에 쓰지 않음). 결과 JSON만 돌려준다: `{items:[{name, amount}], kcal, carbs, protein, fat, confidence}`
 - 사진 5MB 초과 413 `PHOTO_TOO_LARGE`, 이미지가 아니면 400 `INVALID_PHOTO`.
-- 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
+- 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + 기본 목록(`gemini-3.5-flash-lite`, `gemini-3.8-flash`) + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
 
 ## 관리자 API (`X-Admin-Token: <ADMIN_TOKEN>`, 사용자 로그인과 별개)
 | | |

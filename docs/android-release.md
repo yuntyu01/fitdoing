@@ -35,7 +35,7 @@ Settings > Secrets and variables > Actions > Variables. 바꾼 뒤 다시 빌드
 | `AUTH_SECRET` | `openssl rand -hex 32` |
 | `AUTH_DISABLED` | `1` (앱의 `EXPO_PUBLIC_AUTH_DISABLED=1` 과 짝) |
 | `AI_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` | `gemini`, 키, `gemini-3.5-flash-lite` (기본 모델) |
-| `GEMINI_MODELS`, `ADMIN_TOKEN` | 사용자별로 지정할 추가 모델(예: `gemini-3.8-flash`), 관리자 API 토큰(`openssl rand -hex 32`). server/README.md "관리자 API" |
+| `ADMIN_TOKEN` | 관리자 API 토큰(`openssl rand -hex 32`). 사용자별 AI 모델(3.5 flash-lite / 3.8 flash) 지정에 쓴다. server/README.md "관리자 API" |
 | `PUBLIC_BASE_URL` | 서버의 공개 주소 (공유 페이지 링크) |
 | `PHOTO_STORE` (+ R2 값들) | 사진 백업·친구 사진을 쓰려면 `r2` |
 

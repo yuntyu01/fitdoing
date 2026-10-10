@@ -1,6 +1,9 @@
 package platform
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func envOf(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
 
@@ -50,12 +53,19 @@ func TestAIModelsAndAdminToken(t *testing.T) {
 		}
 		return m
 	}
-	cfg, err := LoadConfig(envOf(with("GEMINI_MODELS", " gemini-3.8-flash, gemini-3.5-flash-lite ,gemini-3.8-flash,")))
+	// no configuration: 3.5 flash-lite is the default and 3.8 flash can be assigned
+	cfg, err := LoadConfig(envOf(with()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.GeminiModel != "gemini-3.5-flash-lite" || len(cfg.GeminiExtra) != 1 || cfg.GeminiExtra[0] != "gemini-3.8-flash" {
 		t.Fatalf("models: %q + %q", cfg.GeminiModel, cfg.GeminiExtra)
+	}
+	// GEMINI_MODELS only adds (duplicates and the default are skipped); a different default keeps 3.5 assignable
+	cfg, _ = LoadConfig(envOf(with("GEMINI_MODELS", " gemini-3.8-flash, gemini-3.9-pro ,gemini-3.5-flash-lite,",
+		"GEMINI_MODEL", "gemini-3.8-flash")))
+	if want := "[gemini-3.5-flash-lite gemini-3.9-pro]"; cfg.GeminiModel != "gemini-3.8-flash" || fmt.Sprint(cfg.GeminiExtra) != want {
+		t.Fatalf("models: %q + %v", cfg.GeminiModel, cfg.GeminiExtra)
 	}
 	if cfg.AdminToken != "" {
 		t.Fatal("admin API must be off by default")
