@@ -153,11 +153,10 @@ export function GymPlaceSheet({ visible, value, onClose, onConfirm }: Props) {
               <Text style={styles.hitName} numberOfLines={1}>
                 {draft.name || t('gym.defaultName')}
               </Text>
-              {draft.address ? (
-                <Text style={styles.caption} numberOfLines={2}>
-                  {draft.address}
-                </Text>
-              ) : null}
+              {/* 지금 위치로 정하면 주소를 조회하지 않으므로(외부로 좌표를 보내지 않는다) 좌표를 보여준다 */}
+              <Text style={styles.caption} numberOfLines={2}>
+                {draft.address || `${draft.lat?.toFixed(5)}, ${draft.lng?.toFixed(5)}`}
+              </Text>
             </View>
           </View>
         ) : null}

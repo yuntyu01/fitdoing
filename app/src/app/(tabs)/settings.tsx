@@ -2,10 +2,11 @@ import { router, type Href } from 'expo-router';
 import { ChevronRight, UserRound } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatNumber } from '../../domain/format';
+import { SERVER_CONFIGURED } from '../../features/api/client';
 import { useSyncStatus } from '../../features/api/store';
 import { deleteAccountAndData, logout } from '../../features/auth/account';
 import { AUTH_DISABLED } from '../../features/auth/session';
@@ -87,6 +88,14 @@ export default function SettingsScreen() {
         ? t('sync.last', { time: formatDateTime(lastSyncAt) })
         : t('sync.never');
   const go = (href: Href) => () => router.push(href);
+  const openSupport = () => {
+    void Linking.openURL('https://midi-broccoli-56c.notion.site/FitDoing-3f4502846708812981c9db286d1eef63')
+      .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
+  };
+  const openPrivacy = () => {
+    void Linking.openURL('https://midi-broccoli-56c.notion.site/3f450284670881b880e6fd67ba899903')
+      .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
+  };
 
   const confirmLogout = () =>
     Alert.alert(t('settings.logoutTitle'), t('settings.logoutBody'), [
@@ -159,20 +168,20 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        {/* 잠금 관련 값은 잠금 기능과 함께 편집을 연다. 지금은 값만 보여준다. */}
-        <Section title={t('settings.sectionLock')} note={t('settings.lockSoon')}>
-          <ListRow disabled label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />
+        <Section title={t('settings.sectionLock')}>
+          <ListRow label={t('lockSetup.title')} onPress={go('/edit/lock' as Href)} />
+          <ListRow onPress={go('/edit/lock' as Href)} label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />
           <ListRow
-            disabled
+            onPress={go('/edit/lock' as Href)}
             label={t('settings.emergency')}
             value={t('settings.emergencyValue', { n: s.emergencyPerWeek })}
           />
-          <ListRow disabled label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />
+          <ListRow onPress={go('/edit/lock' as Href)} label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />
         </Section>
 
         <Section
           title={t('settings.sectionApp')}
-          note={`${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}`}
+          note={SERVER_CONFIGURED ? `${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}` : t('settings.localPhotoNote')}
         >
           <ListRow
             label={t('settings.coupons')}
@@ -200,7 +209,12 @@ export default function SettingsScreen() {
             label={t('settings.photoBackup')}
             right={<Toggle value={s.photoBackup} onChange={(photoBackup) => update({ photoBackup })} />}
           />
-          <ListRow disabled label={t('sync.title')} value={syncValue} />
+          <ListRow disabled label={t('sync.title')} value={SERVER_CONFIGURED ? syncValue : t('settings.serverUnavailable')} />
+        </Section>
+
+        <Section title={t('settings.support')} note={SERVER_CONFIGURED ? undefined : t('settings.localBuildNote')}>
+          <ListRow label={t('settings.support')} value="yuntyu01@gmail.com" onPress={openSupport} />
+          <ListRow label={t('settings.privacyPolicy')} onPress={openPrivacy} />
         </Section>
 
         {/* 로그인 없는 빌드(비공개 테스트)에는 로그아웃할 계정이 없다: 누르면 로그인 화면에 갇힌다 */}

@@ -26,7 +26,7 @@ import {
 } from '../../domain/portion';
 import { isExtra, mealLabel, nextExtraIndex } from '../../domain/meals';
 import { dateKey, fromMinutes, parseDateKey } from '../../domain/time';
-import { analyzeMeal, lookupBarcode, type BarcodeProduct } from '../../features/api/client';
+import { analyzeMeal, lookupBarcode, SERVER_CONFIGURED, type BarcodeProduct } from '../../features/api/client';
 import { MAX_PHOTOS, useCaptureDraft, type ShotPhoto } from '../../features/meals/captureDraft';
 import { ItemSheet, type FoodItem } from '../../features/meals/components/ItemSheet';
 import { MealChips } from '../../features/meals/components/MealChips';
@@ -310,13 +310,16 @@ export default function ReviewScreen() {
   const count = ai.items.length;
   const savedDay = saved ? parseDateKey(saved.date) : null;
   const food = ai.items[foodAt];
-  const photoNote = shareFriends
-    ? settings.photoBackup
-      ? 'review.photoNoteBackupShared'
-      : 'review.photoNoteShared'
-    : settings.photoBackup
-      ? 'review.photoNoteBackup'
-      : 'review.photoNote';
+  // 서버가 없는 빌드(EXPO_PUBLIC_API_URL 미설정)는 사진을 서버로 보내지 않는다
+  const photoNote = !SERVER_CONFIGURED
+    ? 'review.photoNoteLocal'
+    : shareFriends
+      ? settings.photoBackup
+        ? 'review.photoNoteBackupShared'
+        : 'review.photoNoteShared'
+      : settings.photoBackup
+        ? 'review.photoNoteBackup'
+        : 'review.photoNote';
 
   if (missing) {
     return (

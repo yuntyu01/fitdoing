@@ -183,6 +183,9 @@ object LockEngine {
   }
 
   private fun ensureService(ctx: Context) {
+    // Do not monitor apps until the user has granted both required permissions.
+    val permissions = Permissions.status(ctx)
+    if (permissions["usageAccess"] != true || permissions["overlay"] != true) return
     try {
       ctx.startForegroundService(Intent(ctx, LockService::class.java))
     } catch (e: Exception) {

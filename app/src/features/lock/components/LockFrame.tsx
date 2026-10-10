@@ -1,4 +1,5 @@
 import { AlarmClock, MapPin, MessageCircle, MessageSquare, Phone, type LucideIcon } from 'lucide-react-native';
+import { router, type Href } from 'expo-router';
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -37,6 +38,7 @@ interface FrameProps {
  * 작은 화면에서는 본문이 스크롤돼 하단 버튼에 가리지 않는다.
  */
 export function LockFrame({ label, title, desc, children, footer }: FrameProps) {
+  const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   useBlockBack();
   return (
@@ -46,6 +48,9 @@ export function LockFrame({ label, title, desc, children, footer }: FrameProps) 
           <Text style={styles.label} numberOfLines={1}>
             {label}
           </Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/edit/lock' as Href)}>
+            <Text style={styles.label}>{t('lockSetup.title')}</Text>
+          </Pressable>
         </View>
       }
       title={title}

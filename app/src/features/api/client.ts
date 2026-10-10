@@ -4,6 +4,7 @@ import { fetch } from 'expo/fetch';
 import type { AiResult, Settings } from '../../db/schema';
 import { sanitizeItem, type MealBackup } from '../../domain/logging';
 import type { Provider } from '../../domain/auth';
+import { resolveApiEndpoint } from '../../domain/apiEndpoint';
 import type { Snapshot } from '../../domain/restore';
 import {
   backoffMs,
@@ -29,7 +30,8 @@ import { pushItems, readQueue, removeItems, writeMeta } from './store';
 // - 친구에게 공유한 끼니(기록 확인에서 켠 끼니만): 친구가 볼 수 있게 그 끼니 사진을 같은 자리(send의 upload)에 저장한다.
 //   공유 없이 다시 기록하면 그 끼니 사진을 지운다(trackMealPhoto). 사진 백업을 끄면 공유 끼니 사진도 함께 지워진다.
 
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:8080').replace(/\/+$/, '');
+export const API_URL = resolveApiEndpoint(process.env.EXPO_PUBLIC_API_URL, __DEV__);
+export const SERVER_CONFIGURED = API_URL.length > 0;
 
 const ANALYZE_TIMEOUT_MS = 30_000;
 const BACKUP_TIMEOUT_MS = 10_000;
@@ -56,6 +58,7 @@ interface RequestInit {
 }
 
 async function request(path: string, init: RequestInit, timeoutMs: number) {
+  if (!SERVER_CONFIGURED) throw new ApiError(503, 'Server features are unavailable in this build.');
   const headers: Record<string, string> = {};
   if (!init.anonymous) {
     const token = init.token ?? useSession.getState().token;
@@ -342,7 +345,7 @@ export async function deleteComment(id: string): Promise<void> {
 /** 친구가 공유한 끼니 사진. RN Image가 Authorization 헤더를 실어 직접 받는다. 로그인 전이면 null. */
 export function friendPhotoSource(postId: string): { uri: string; headers: Record<string, string> } | null {
   const token = useSession.getState().token;
-  if (!token) return null;
+  if (!SERVER_CONFIGURED || !token) return null;
   return {
     uri: `${API_URL}/api/friends/photo?postId=${encodeURIComponent(postId)}`,
     headers: { Authorization: `Bearer ${token}` },

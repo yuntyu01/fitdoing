@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { usePathname, useRootNavigationState, useRouter, type Href } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { useSession } from '../auth/session';
@@ -11,7 +11,7 @@ import { getLockEngine } from './engine';
 import { useLock } from './store';
 
 // 잠금 화면에서 촬영 화면으로 갔다 올 수 있어야 하니, 이 경로에서는 잠금 화면으로 끌어오지 않는다.
-const FREE_PATHS = ['/capture'];
+const FREE_PATHS = ['/capture', '/edit/lock'];
 const POLL_MS = 20_000;
 
 /**
@@ -28,12 +28,14 @@ export function useLockController() {
   const active = useLock((s) => s.active);
   const loggedIn = useSession((s) => s.status === 'in');
   const hasSettings = settings !== null;
+  const previousSettings = useRef(settings);
 
   useEffect(() => {
     if (!settings) return;
     getLockEngine()
-      .setSchedule(settings)
+      .setSchedule(settings, previousSettings.current !== null && previousSettings.current !== settings)
       .catch(() => {});
+    previousSettings.current = settings;
     useLock.getState().refresh();
   }, [settings]);
 
@@ -42,7 +44,12 @@ export function useLockController() {
     const run = () => {
       useLock.getState().refresh();
     };
-    const appSub = AppState.addEventListener('change', (s) => s === 'active' && run());
+    const appSub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active') return;
+      const current = useSettings.getState().settings;
+      if (current) void getLockEngine().setSchedule(current);
+      run();
+    });
     const notifSub = Notifications.addNotificationResponseReceivedListener(run);
     const engine = getLockEngine();
     const startedSub = engine.onLockStarted(run);

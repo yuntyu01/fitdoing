@@ -5,6 +5,8 @@ object BlockPolicy {
   val FALLBACK_ALWAYS_ALLOWED: Set<String> = setOf(
     "android",
     "com.android.systemui",
+    // Users must always be able to review/revoke FitDoing permissions or uninstall it.
+    "com.android.settings",
     "com.android.permissioncontroller",
     "com.google.android.permissioncontroller",
     // 전화

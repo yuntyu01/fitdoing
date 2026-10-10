@@ -45,9 +45,11 @@ Settings > Secrets and variables > Actions > Variables. 바꾼 뒤 다시 빌드
 
 ## 비공개 테스트 올리기
 
-1. Actions > `CD: Android Play Store` > Run workflow (track `alpha`). `PLAY_SERVICE_ACCOUNT_JSON` 이 없으면 업로드는 건너뛰고 서명된 AAB 만 artifact 로 남는다.
-2. 첫 버전은 Play Console > 테스트 > 비공개 테스트 > 새 버전 만들기에서 그 AAB 를 직접 올린다 (Play 는 새 앱의 첫 AAB 를 API 로 받지 않는다).
-3. 그다음부터는 서비스 계정 JSON 을 `PLAY_SERVICE_ACCOUNT_JSON` Secret 에 넣으면 `v0.1.1` 같은 태그 push 만으로 alpha(비공개 테스트) 트랙에 올라간다.
+- **자동:** main 에 `app/`·`modules/`·이 워크플로가 바뀐 커밋이 푸시되면 `CD: Android Play Store` 가 돌아 alpha(비공개 테스트) 트랙에 올린다. 연달아 푸시하면 앞 빌드는 취소되고 마지막 것만 올라간다. 태그 `v0.1.1` 도 alpha 로 올린다(버전 이름 = 태그).
+- **필요한 것:** 업로드에는 `PLAY_SERVICE_ACCOUNT_JSON` Secret 이 있어야 한다. 없으면 빌드는 돌지만 업로드는 건너뛰고 서명된 AAB 만 artifact 로 남는다(Summary 에 "Play 업로드: 건너뜀").
+- **첫 버전:** Play 는 새 앱의 첫 AAB 를 API 로 받지 않는다. 처음 한 번은 Play Console > 테스트 > 비공개 테스트 > 새 버전 만들기에서 artifact 의 AAB 를 직접 올린다.
+- **서비스 계정 만들기:** Google Cloud 콘솔에서 서비스 계정을 만들고 JSON 키를 받는다 → Google Play Console > 사용자 및 권한 > 새 사용자 초대에 그 서비스 계정 이메일을 넣고, 이 앱에 "출시 관리(테스트 트랙)" 권한을 준다 → JSON 전체를 GitHub Secret `PLAY_SERVICE_ACCOUNT_JSON` 에 붙여 넣는다.
+- **손으로:** Actions > `CD: Android Play Store` > Run workflow 로 트랙을 골라 돌릴 수도 있다.
 
 ## 처음 한 번은 손으로
 
