@@ -1,4 +1,13 @@
-import { deadlinesFor, mealStatuses, resizeMeals, scheduleDay, type MealSlot } from './meals';
+import {
+  deadlinesFor,
+  isExtra,
+  mealLabel,
+  mealStatuses,
+  nextExtraIndex,
+  resizeMeals,
+  scheduleDay,
+  type MealSlot,
+} from './meals';
 import { dateKey } from './time';
 
 const four: MealSlot[] = [
@@ -81,5 +90,19 @@ describe('resizeMeals', () => {
     const r = resizeMeals(four, 3);
     expect(r).toHaveLength(3);
     expect(r.map((m) => m.index)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('기타 끼니', () => {
+  it('7부터 빈 번호를 쓰고, 셋 다 쓰면 null', () => {
+    expect(nextExtraIndex([1, 2])).toBe(7);
+    expect(nextExtraIndex([7, 9])).toBe(8);
+    expect(nextExtraIndex([7, 8, 9])).toBeNull();
+  });
+  it('이름: 계획 끼니와 기타', () => {
+    const t = (k: string, o: { n: number }) => (k === 'common.extra' ? `기타 ${o.n}` : `${o.n}끼`);
+    expect(mealLabel(t, 2)).toBe('2끼');
+    expect(mealLabel(t, 8)).toBe('기타 2');
+    expect(isExtra(6)).toBe(false);
   });
 });

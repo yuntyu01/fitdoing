@@ -186,12 +186,31 @@ type Request struct {
 	LoggedAt     *time.Time    `json:"loggedAt"`
 }
 
+// Meal numbers: 1~6 are the planned meals (meal slots with deadlines); ExtraBase~MaxIndex are "기타" (a snack or
+// anything outside the plan) — no deadline, never locked, not counted as a planned meal, but eaten (in totals).
+const (
+	MaxSlot   = 6
+	ExtraBase = 7
+	MaxIndex  = 9
+)
+
+// IsExtra: a "기타" entry, not one of the planned meals.
+func IsExtra(index int) bool { return index >= ExtraBase }
+
+// Label is how a meal number reads: "2끼", or "기타 1" for the extras.
+func Label(index int) string {
+	if IsExtra(index) {
+		return fmt.Sprintf("기타 %d", index-ExtraBase+1)
+	}
+	return fmt.Sprintf("%d끼", index)
+}
+
 func (r *Request) Validate() error {
 	switch {
 	case r.Date.IsZero():
 		return platform.Invalid("date", "필수예요")
-	case r.Index < 1 || r.Index > 6:
-		return platform.Invalid("index", "1~6 사이여야 해요")
+	case r.Index < 1 || r.Index > MaxIndex:
+		return platform.Invalid("index", "1~9 사이여야 해요 (7~9는 기타)")
 	case r.Deadline != nil && !settings.ValidHHMM(*r.Deadline):
 		return platform.Invalid("deadline", "HH:mm 형식이어야 해요")
 	case r.AI == nil:
@@ -247,7 +266,8 @@ func (s *Service) log(tx *gorm.DB, d Deps, userID string, r Request) (Logged, er
 	if err != nil {
 		return Logged{}, err
 	}
-	if r.Index > len(st.Meals) {
+	extra := IsExtra(r.Index)
+	if !extra && r.Index > len(st.Meals) {
 		return Logged{}, platform.BadRequest("INVALID", fmt.Sprintf("설정한 끼니 수(%d)보다 큰 번호예요", len(st.Meals)))
 	}
 	if !slices.Contains(Portions, r.Portion) {
@@ -262,7 +282,10 @@ func (s *Service) log(tx *gorm.DB, d Deps, userID string, r Request) (Logged, er
 	}
 	wasCheat := m.Cheat
 	m.UserID, m.Date, m.Index = userID, r.Date, r.Index
-	m.Deadline = st.Meals[r.Index-1].Deadline
+	m.Deadline = "" // "기타" has no deadline
+	if !extra {
+		m.Deadline = st.Meals[r.Index-1].Deadline
+	}
 	for _, slot := range st.Meals {
 		if slot.Index == r.Index {
 			m.Deadline = slot.Deadline
@@ -279,7 +302,7 @@ func (s *Service) log(tx *gorm.DB, d Deps, userID string, r Request) (Logged, er
 	if r.LoggedAt != nil {
 		m.LoggedAt = r.LoggedAt.UTC()
 	}
-	m.Cheat = st.Mode == settings.ModeSpicy &&
+	m.Cheat = !extra && st.Mode == settings.ModeSpicy &&
 		(r.Cheat || NutritionOf(m).Kcal > 2*st.Targets.PerMeal(len(st.Meals)).Kcal)
 	if err := tx.Omit("User").Save(&m).Error; err != nil {
 		return Logged{}, err
@@ -302,8 +325,11 @@ func (s *Service) log(tx *gorm.DB, d Deps, userID string, r Request) (Logged, er
 			return Logged{}, err
 		}
 	}
-	if err := d.Locks.ReleaseOpen(userID, lock.Meal); err != nil {
-		return Logged{}, err
+	// a planned meal releases a meal lock; "기타" (a snack) does not
+	if !extra {
+		if err := d.Locks.ReleaseOpen(userID, lock.Meal); err != nil {
+			return Logged{}, err
+		}
 	}
 	sum, err := d.Coupons.Summary(userID, r.Date)
 	if err != nil {

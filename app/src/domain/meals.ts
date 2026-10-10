@@ -82,3 +82,23 @@ export function resizeMeals(meals: MealSlot[], count: number): MealSlot[] {
     deadline: meals.length === count ? meals[i].deadline : defaults[i],
   }));
 }
+
+// ── 기타 (계획 밖 간식 등) ─────────────────────────────────
+// 끼니 번호 1~6은 계획한 끼니(마감 있음), 7~9는 "기타": 마감·잠금이 없고 "다 찍은 날" 계산에 들지 않지만
+// 먹은 것이므로 하루 합계에는 들어간다. 서버(meal.ExtraBase)와 같은 번호.
+export const EXTRA_BASE = 7;
+export const MAX_EXTRA = 3;
+
+export const isExtra = (index: number) => index >= EXTRA_BASE;
+
+/** 그날 아직 안 쓴 기타 번호(7→8→9), 다 썼으면 null */
+export function nextExtraIndex(usedIndexes: Iterable<number>): number | null {
+  const used = new Set(usedIndexes);
+  for (let i = EXTRA_BASE; i < EXTRA_BASE + MAX_EXTRA; i++) if (!used.has(i)) return i;
+  return null;
+}
+
+/** 끼니 이름: "2끼", 기타는 "기타 1" (t 는 i18n) */
+export function mealLabel(t: (key: 'common.meal' | 'common.extra', o: { n: number }) => string, index: number): string {
+  return isExtra(index) ? t('common.extra', { n: index - EXTRA_BASE + 1 }) : t('common.meal', { n: index });
+}

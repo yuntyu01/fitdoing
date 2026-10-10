@@ -60,9 +60,10 @@ describe('로컬 행 -> 사실', () => {
       dates: ['2026-10-01', '2026-10-02'],
       mealsPlanned: 2,
       meals: [
-        { date: '2026-10-01', status: 'logged' },
-        { date: '2026-10-01', status: 'logged' },
-        { date: '2026-10-02', status: 'locked' },
+        { date: '2026-10-01', index: 1, status: 'logged' },
+        { date: '2026-10-01', index: 2, status: 'logged' },
+        { date: '2026-10-01', index: 7, status: 'logged' }, // 기타는 "다 찍은" 끼니 수에 넣지 않는다
+        { date: '2026-10-02', index: 1, status: 'locked' },
       ],
       gymDates: ['2026-10-02'],
       sleepDates: ['2026-10-01'],

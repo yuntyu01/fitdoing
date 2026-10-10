@@ -68,6 +68,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 - 음식마다 칼로리·탄단지를 받고(`items[].kcal/carbs/protein/fat`), 끼니 합계는 서버가 더한다. 응답은 숫자 누락·범위(`Result.Validate`)를 검사해서 어기면 `AI_FAILED`. 음식별 값은 `meal_items`에 저장되고(직접 입력한 음식은 null), 끼니 합계는 `meal_logs`가 기준이다.
 - 영양성분표 사진도 같은 분석으로 받는다: 표의 숫자를 그대로 옮기고(추정하지 않음) 양에 표의 기준(총 내용량·1회 제공량·100g당)을 적는다.
 - 사진은 저장하지 않는다(메모리에서만 처리, 디스크에 쓰지 않음). 결과 JSON만 돌려준다: `{items:[{name, amount}], kcal, carbs, protein, fat, confidence}`
+- 한 끼니의 사진은 최대 3장을 `photo` 필드에 함께 보내면 한 번에 분석한다(여러 장에 같은 음식이 보이면 한 번만 센다). 4장 이상 400 `TOO_MANY_PHOTOS`.
 - 사진 5MB 초과 413 `PHOTO_TOO_LARGE`, 이미지가 아니면 400 `INVALID_PHOTO`.
 - 모델: 사용자마다 관리자가 지정한 모델(`user_ai_models`)을 쓰고, 지정이 없으면 `GEMINI_MODEL`. 허용 모델은 `GEMINI_MODEL` + 기본 목록(`gemini-3.5-flash-lite`, `gemini-3.8-flash`) + `GEMINI_MODELS`뿐이다. 지정했던 모델을 설정에서 빼면 그 사용자는 기본 모델로 돌아간다(지정 기록은 남는다). 응답 헤더 `X-AI-Model`이 쓴 모델이다.
 
@@ -136,6 +137,7 @@ curl -b admin.jar https://<서버>/api/admin/users
 끼니 기록(`meal_logs` + `meal_items` + 치팅 쿠폰 + 잠금 해제)은 한 트랜잭션이라 중간에 실패하면 아무것도 남지 않는다.
 
 ## DB 스키마 (정규화, JSON 컬럼 없음)
+끼니 번호(`meal_index`): 1~6 은 계획한 끼니(마감 있음), 7~9 는 "기타"(계획 밖 간식 등: 마감 없음, 잠금·"다 찍은 날"·끼니 수에 안 들어가고 합계에는 들어간다).
 모든 데이터 테이블은 `user_id` 로 `users` 를 가리키고 `ON DELETE CASCADE` 다(회원 탈퇴 = 사용자 행 삭제로 전부 삭제). 날짜는 `YYYY-MM-DD` 문자열, 시각은 timestamptz(`time.Time`), 마감 시각은 `HH:mm` 문자열. enum 은 CHECK 제약. 방언 의존 SQL 없이 GORM 으로만 접근(SQLite·Postgres 공통). SQLite 는 연결마다 `foreign_keys=ON`.
 
 | 테이블 | 키 | 주요 컬럼 | 관계·제약 |

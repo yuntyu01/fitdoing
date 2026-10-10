@@ -152,7 +152,7 @@ func view(p Page, token string, loc *time.Location) pageView {
 		}
 		for _, m := range d.Meals {
 			mv := mealView{
-				Label:  fmt.Sprintf("%d끼", m.Index),
+				Label:  meal.Label(m.Index),
 				Time:   m.LoggedAt.In(loc).Format("15:04"),
 				Foods:  strings.Join(m.Foods, " · "),
 				Kcal:   comma(roundKcal(m.Nutrition.Kcal)),

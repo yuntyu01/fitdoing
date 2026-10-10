@@ -25,6 +25,9 @@ const prompt = `식단 사진이다. 보이는 음식(음료 포함)을 하나�
 총 내용량 기준 값이 있으면 그것을, 없으면 표의 기준량 값을 써라. 표에서 읽을 수 없는 영양소만 추정하고 confidence를 낮춰라.
 음식도 영양성분표도 아니면 items를 비우고 confidence는 0으로 답해라. 한국어로 답해라.`
 
+// multiPrompt is added when one meal comes as several photos (e.g. side dishes on other plates, or two angles).
+const multiPrompt = `사진 여러 장은 모두 같은 한 끼니다. 여러 사진에 같은 음식이 보이면 한 번만 세라(겹쳐 세지 마라).`
+
 const geminiBase = "https://generativelanguage.googleapis.com/v1beta"
 
 // Gemini calls generateContent with the photo inline (base64) and a fixed responseSchema.
@@ -51,7 +54,21 @@ func obj(props map[string]any, required ...string) map[string]any {
 	return map[string]any{"type": "OBJECT", "properties": props, "required": required}
 }
 
-func (g *Gemini) body(image []byte, contentType string) map[string]any {
+// parts: the prompt, then every photo of the meal as inline data.
+func parts(photos []Photo) []any {
+	text := prompt
+	if len(photos) > 1 {
+		text += "\n" + multiPrompt
+	}
+	out := []any{map[string]any{"text": text}}
+	for _, p := range photos {
+		out = append(out, map[string]any{"inline_data": map[string]any{
+			"mime_type": p.ContentType, "data": base64.StdEncoding.EncodeToString(p.Data)}})
+	}
+	return out
+}
+
+func (g *Gemini) body(photos []Photo) map[string]any {
 	str := map[string]any{"type": "STRING"}
 	num := map[string]any{"type": "INTEGER"}
 	item := obj(map[string]any{"name": str, "amount": str, "kcal": num, "carbs": num, "protein": num, "fat": num},
@@ -61,17 +78,13 @@ func (g *Gemini) body(image []byte, contentType string) map[string]any {
 		"confidence": map[string]any{"type": "NUMBER"},
 	}, "items", "confidence")
 	return map[string]any{
-		"contents": []any{map[string]any{"parts": []any{
-			map[string]any{"text": prompt},
-			map[string]any{"inline_data": map[string]any{
-				"mime_type": contentType, "data": base64.StdEncoding.EncodeToString(image)}},
-		}}},
+		"contents":         []any{map[string]any{"parts": parts(photos)}},
 		"generationConfig": map[string]any{"responseMimeType": "application/json", "responseSchema": schema},
 	}
 }
 
-func (g *Gemini) Analyze(ctx context.Context, image []byte, contentType string) (Result, error) {
-	res, err := g.call(ctx, image, contentType)
+func (g *Gemini) Analyze(ctx context.Context, photos []Photo) (Result, error) {
+	res, err := g.call(ctx, photos)
 	if err != nil {
 		slog.Warn("gemini analyze failed", "err", err)
 		return Result{}, &platform.Error{Status: http.StatusBadGateway, Code: "AI_FAILED",
@@ -80,8 +93,8 @@ func (g *Gemini) Analyze(ctx context.Context, image []byte, contentType string) 
 	return res, nil
 }
 
-func (g *Gemini) call(ctx context.Context, image []byte, contentType string) (Result, error) {
-	payload, err := json.Marshal(g.body(image, contentType))
+func (g *Gemini) call(ctx context.Context, photos []Photo) (Result, error) {
+	payload, err := json.Marshal(g.body(photos))
 	if err != nil {
 		return Result{}, err
 	}

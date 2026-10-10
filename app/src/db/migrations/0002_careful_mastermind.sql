@@ -1,0 +1,1 @@
+ALTER TABLE `meal_logs` ADD `extra_photo_uris` text;

@@ -8,6 +8,7 @@ import { Linking, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cleanBarcode, pickMealIndex } from '../../domain/logging';
+import { useCaptureDraft } from '../../features/meals/captureDraft';
 import { releaseGymLock } from '../../features/lock/actions';
 import { useSettingsValue } from '../../features/settings/store';
 import { useNow, useToday } from '../../features/today/useToday';
@@ -31,7 +32,9 @@ export default function CaptureScreen() {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const settings = useSettingsValue();
-  const { purpose } = useLocalSearchParams<{ purpose?: string }>();
+  // add=1: 기록 확인 화면에서 같은 끼니 사진을 더 찍으러 왔다 (찍으면 돌아간다, 바코드 모드 없음)
+  const { purpose, add } = useLocalSearchParams<{ purpose?: string; add?: string }>();
+  const adding = add === '1';
   const now = useNow();
   const today = useToday(settings, now);
   const mealIndex = pickMealIndex(today.meals);
@@ -85,6 +88,11 @@ export default function CaptureScreen() {
         router.back();
         return;
       }
+      if (adding) {
+        useCaptureDraft.getState().add({ uri: pic.uri, w: pic.width, h: pic.height });
+        router.back();
+        return;
+      }
       goReview({ photoUri: pic.uri, w: String(pic.width), h: String(pic.height) });
     } catch (e) {
       console.warn('takePicture failed', e);
@@ -112,7 +120,13 @@ export default function CaptureScreen() {
   const canFlash = cameraFacing === 'back';
   // 원은 미리보기 안에 여백을 두고 들어가는 가장 큰 크기 (위 안내 문구 자리를 뺀다)
   const plate = preview ? Math.max(160, Math.min(preview.w - 32, preview.h - 120)) : 0;
-  const title = gym ? t('capture.gymTitle') : mealIndex ? t('capture.titleMeal', { n: mealIndex }) : t('capture.title');
+  const title = gym
+    ? t('capture.gymTitle')
+    : adding
+      ? t('capture.addTitle')
+      : mealIndex
+        ? t('capture.titleMeal', { n: mealIndex })
+        : t('capture.title');
   const hint = gym ? t('capture.gymGuide') : barcode ? t('capture.barcodeGuide') : t('capture.plateGuide');
 
   return (
@@ -178,8 +192,9 @@ export default function CaptureScreen() {
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + layout.page }]}>
         {error ? <Text style={styles.error}>{t('capture.failed')}</Text> : null}
-        {/* 헬스 인증 사진에는 바코드가 쓸모없고, 읽으면 끼니 기록으로 넘어가 버리므로 고를 수 없게 한다. */}
-        {gym ? null : (
+        {/* 헬스 인증 사진에는 바코드가 쓸모없고, 읽으면 끼니 기록으로 넘어가 버리므로 고를 수 없게 한다.
+            사진 추가(같은 끼니 2·3번째 장)도 사진만 찍는다. */}
+        {gym || adding ? null : (
           <View style={styles.modes}>
             {(['photo', 'barcode'] as const).map((m) => (
               <Pressable

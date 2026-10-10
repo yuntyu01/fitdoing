@@ -17,8 +17,8 @@ const adminPassword = "운동하는-관리자-2026"
 // namedMock answers like ai.Mock but puts its model name in the first food, so a test sees which model ran.
 type namedMock struct{ name string }
 
-func (m namedMock) Analyze(ctx context.Context, image []byte, ct string) (ai.Result, error) {
-	r, err := ai.Mock{}.Analyze(ctx, image, ct)
+func (m namedMock) Analyze(ctx context.Context, photos []ai.Photo) (ai.Result, error) {
+	r, err := ai.Mock{}.Analyze(ctx, photos)
 	r.Items[0].Name = m.name
 	return r, err
 }

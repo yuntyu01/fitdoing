@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { FoodItem, gymLogs, lockEvents } from '../../db/schema';
 import { formatNumber, roundKcal } from '../../domain/format';
+import { mealLabel } from '../../domain/meals';
 import { eatenFoodInMeal } from '../../domain/portion';
 import { eatenFactor } from '../../domain/stats';
 import { Divider } from '../../ui/Card';
@@ -31,7 +32,7 @@ export function MealSection({ meal, onEdit }: { meal: MealRow; onEdit?: () => vo
   return (
     <View>
       <View style={styles.titleRow}>
-        <Text style={styles.sectionTitle}>{t('common.meal', { n: meal.index })}</Text>
+        <Text style={styles.sectionTitle}>{mealLabel(t, meal.index)}</Text>
         {time ? <Text style={styles.time}>{time}</Text> : null}
         <View style={styles.spacer} />
         {onEdit ? (
@@ -53,6 +54,14 @@ export function MealSection({ meal, onEdit }: { meal: MealRow; onEdit?: () => vo
           style={styles.photo}
           accessibilityLabel={t('records.mealPhoto', { n: meal.index })}
         />
+      ) : null}
+      {/* 같은 끼니의 2·3번째 사진 */}
+      {meal.extraPhotoUris?.length ? (
+        <View style={styles.extraPhotos}>
+          {meal.extraPhotoUris.map((u) => (
+            <Image key={u} source={{ uri: u }} style={styles.extraPhoto} />
+          ))}
+        </View>
       ) : null}
 
       <View style={styles.items}>
@@ -174,6 +183,8 @@ const makeStyles = (c: Palette) =>
     edit: { ...text.body, color: c.sub },
     pressed: { opacity: 0.6 },
     photo: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.card, marginTop: 12, backgroundColor: c.card },
+    extraPhotos: { flexDirection: 'row', gap: 8, marginTop: 8 },
+    extraPhoto: { flex: 1, aspectRatio: 1, maxWidth: 120, borderRadius: radius.field, backgroundColor: c.card },
     items: { marginTop: 12, marginBottom: 4 },
     muted: { ...text.body, color: c.sub, paddingVertical: 10 },
     food: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 10 },

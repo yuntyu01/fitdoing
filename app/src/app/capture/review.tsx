@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronDown, ChevronRight } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -24,14 +24,16 @@ import {
   mealToSave,
   usesFoodPortions,
 } from '../../domain/portion';
-import { fromMinutes, parseDateKey } from '../../domain/time';
+import { isExtra, mealLabel, nextExtraIndex } from '../../domain/meals';
+import { dateKey, fromMinutes, parseDateKey } from '../../domain/time';
 import { analyzeMeal, lookupBarcode, type BarcodeProduct } from '../../features/api/client';
+import { MAX_PHOTOS, useCaptureDraft, type ShotPhoto } from '../../features/meals/captureDraft';
 import { ItemSheet, type FoodItem } from '../../features/meals/components/ItemSheet';
 import { MealChips } from '../../features/meals/components/MealChips';
 import { NutritionSheet } from '../../features/meals/components/NutritionSheet';
 import { PortionSheet } from '../../features/meals/components/PortionSheet';
 import { deleteStoredPhoto, shrinkPhoto, storePhoto } from '../../features/meals/photos';
-import { logMeal, readLoggedMeal } from '../../features/meals/save';
+import { loggedIndexesOn, logMeal, readLoggedMeal } from '../../features/meals/save';
 import { useSettingsValue } from '../../features/settings/store';
 import { useNow, useToday } from '../../features/today/useToday';
 import { Card, Divider } from '../../ui/Card';
@@ -80,7 +82,16 @@ export default function ReviewScreen() {
   );
   const missing = editMode && !saved;
 
-  const photoUri = saved ? saved.photoUri : params.photoUri || null;
+  // 이 끼니의 사진(최대 3장). 첫 장은 촬영 화면에서 오고, "사진 추가"로 카메라를 다시 열어 더 찍는다.
+  const [photos, setPhotos] = useState<ShotPhoto[]>(() =>
+    !saved && params.photoUri ? [{ uri: params.photoUri, w: Number(params.w) || 0, h: Number(params.h) || 0 }] : [],
+  );
+  const shownPhotos = saved
+    ? [saved.photoUri, ...(saved.extraPhotoUris ?? [])].filter((u): u is string => !!u)
+    : photos.map((p) => p.uri);
+  const photoUri = shownPhotos[0] ?? null;
+  // 긴 변 1024px 사본 (원본 경로 → 사본 경로). 분석·저장에 쓰고, 다시 분석할 때 다시 줄이지 않는다.
+  const smalls = useRef<Record<string, string>>({});
   const barcode = saved ? saved.barcode : cleanBarcode(params.barcode);
 
   // 헤더 아래 "오늘 18:40": 찍은(이 화면을 연) 시각. 수정이면 그 끼니를 기록한 날·시각.
@@ -89,7 +100,6 @@ export default function ReviewScreen() {
   // 바코드 조회 결과: 찾은 제품 / 등록 안 된 바코드(notFound) / 조회를 못 함(unavailable)
   const [product, setProduct] = useState<BarcodeProduct | 'notFound' | 'unavailable' | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [shrunk, setShrunk] = useState<string | null>(null);
   const [ai, setAi] = useState<AiResult>(saved?.ai ?? EMPTY_AI);
   const [portion, setPortion] = useState<Portion>((saved?.portion ?? 1) as Portion);
   const [shared, setShared] = useState(saved?.sharedMeal ?? false);
@@ -107,16 +117,19 @@ export default function ReviewScreen() {
   const [foodAt, setFoodAt] = useState(0);
   const [foodOpen, setFoodOpen] = useState(false);
 
-  // 사진 → 긴 변 1024px로 줄이기 → 서버 분석. 서버가 죽어도 직접 입력으로 이어진다. 수정에서는 분석하지 않는다.
+  // 사진(1~3장) → 긴 변 1024px로 줄이기 → 한 번에 서버 분석. 서버가 죽어도 직접 입력으로 이어진다. 수정에서는 분석하지 않는다.
+  // 사진을 더하거나 빼면 모두 다시 분석한다(같은 음식이 여러 장에 있어도 서버가 한 번만 센다).
+  const photoKey = photos.map((p) => p.uri).join('|');
   useEffect(() => {
-    if (!photoUri || editMode) return;
+    if (!photos.length || editMode) return;
     let cancelled = false;
     (async () => {
       try {
-        const small = shrunk ?? (await shrinkPhoto(photoUri, Number(params.w) || 0, Number(params.h) || 0));
-        if (cancelled) return;
-        setShrunk(small);
-        const result = await analyzeMeal(small);
+        for (const p of photos) {
+          if (!smalls.current[p.uri]) smalls.current[p.uri] = await shrinkPhoto(p.uri, p.w, p.h);
+          if (cancelled) return;
+        }
+        const result = await analyzeMeal(photos.map((p) => smalls.current[p.uri]));
         if (cancelled) return;
         setAi(result);
         setManualTotals(false);
@@ -129,9 +142,25 @@ export default function ReviewScreen() {
     return () => {
       cancelled = true;
     };
-    // shrunk는 첫 실행에서 채워지므로 의존성에서 뺀다. 다시 인식하기는 attempt로만 돌린다.
+    // 다시 인식하기는 attempt로, 사진을 더하거나 빼면 photoKey로 다시 돈다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photoUri, params.w, params.h, attempt]);
+  }, [photoKey, attempt]);
+
+  // 카메라에서 "사진 추가"로 찍고 돌아오면 그 사진을 붙인다
+  useFocusEffect(
+    useCallback(() => {
+      const added = useCaptureDraft.getState().take();
+      if (!added.length) return;
+      setPhotos((cur) => [...cur, ...added].slice(0, MAX_PHOTOS));
+      setPhase('analyzing');
+    }, []),
+  );
+
+  const addPhoto = () => router.push({ pathname: '/capture', params: { add: '1' } });
+  const removePhoto = (uri: string) => {
+    setPhotos((cur) => cur.filter((p) => p.uri !== uri));
+    setPhase('analyzing');
+  };
 
   // 바코드: 찍자마자 제품·영양정보를 찾아 채운다(누를 것 없음). 못 찾으면 직접 입력이나 성분표 사진으로.
   useEffect(() => {
@@ -170,8 +199,12 @@ export default function ReviewScreen() {
   }, [barcode, photoUri, editMode, attempt]);
 
   const meals = today.meals;
+  const day = dateKey(today.day);
+  // 기타(계획 밖 간식 등): 그날 안 쓴 7~9 번호. 다 썼으면 고를 수 없다.
+  const [freeExtra] = useState(() => (saved ? null : nextExtraIndex(loggedIndexesOn(day))));
   const chosen = saved ? saved.index : (mealIndex ?? pickMealIndex(meals));
-  const slot = saved ? null : (meals.find((m) => m.index === chosen) ?? null);
+  const extraChosen = !saved && chosen !== null && isExtra(chosen);
+  const slot = saved || extraChosen ? null : (meals.find((m) => m.index === chosen) ?? null);
   const already = !!slot?.log;
 
   // 저장할 모양: 모든 음식에 숫자가 있으면 음식별 먹은 양의 합(끼니 먹은 양 1), 아니면 끼니 전체 먹은 양.
@@ -220,26 +253,39 @@ export default function ReviewScreen() {
   const save = async () => {
     const target = saved
       ? { date: saved.date, index: saved.index, deadline: saved.deadline }
-      : slot
-        ? {
-            date: slot.date,
-            index: slot.index,
-            deadline: settings.meals.find((m) => m.index === slot.index)?.deadline ?? '00:00',
-          }
-        : null;
+      : extraChosen && chosen !== null
+        ? { date: day, index: chosen, deadline: '' } // 기타는 마감이 없다
+        : slot
+          ? {
+              date: slot.date,
+              index: slot.index,
+              deadline: settings.meals.find((m) => m.index === slot.index)?.deadline ?? '00:00',
+            }
+          : null;
     if (!target || saving) return;
     setSaving(true);
     setSaveError(false);
     const at = Date.now();
     let stored: string | null = null;
+    let extras: string[] = [];
     try {
       // 사진은 폰 안(앱 문서 디렉터리)에 저장한다. 수정은 원래 사진을 그대로 둔다(같은 경로라 지워지지 않는다).
-      if (saved) stored = saved.photoUri;
-      else if (shrunk) stored = storePhoto(shrunk, target.date, target.index, at);
+      if (saved) {
+        stored = saved.photoUri;
+        extras = saved.extraPhotoUris ?? [];
+      } else {
+        const files: string[] = [];
+        for (const [i, p] of photos.entries()) {
+          const small = smalls.current[p.uri] ?? (await shrinkPhoto(p.uri, p.w, p.h));
+          files.push(storePhoto(small, target.date, target.index, at + i)); // 같은 끼니 사진끼리 이름이 겹치지 않게
+        }
+        [stored = null, ...extras] = files;
+      }
       await logMeal(
         {
           ...target,
           photoUri: stored,
+          extraPhotoUris: extras,
           barcode,
           ai: plan.ai,
           portion: plan.portion,
@@ -252,7 +298,7 @@ export default function ReviewScreen() {
       close();
     } catch (e) {
       console.warn('log meal failed', e);
-      if (!saved) deleteStoredPhoto(stored);
+      if (!saved) [stored, ...extras].forEach((u) => deleteStoredPhoto(u));
       setSaveError(true);
       setSaving(false);
     }
@@ -287,7 +333,7 @@ export default function ReviewScreen() {
           <CenterHeader
             title={t(saved ? 'review.editTitle' : 'review.title')}
             onBack={leave}
-            right={chosen ? <Text style={styles.headerRight}>{t('common.meal', { n: chosen })}</Text> : null}
+            right={chosen ? <Text style={styles.headerRight}>{mealLabel(t, chosen)}</Text> : null}
           />
           <Text style={styles.when}>
             {savedDay
@@ -299,13 +345,52 @@ export default function ReviewScreen() {
       footer={
         <>
           {saveError ? <Text style={styles.error}>{t('review.saveFailed')}</Text> : null}
-          <FullButton label={t('review.save')} onPress={save} disabled={saving || (!slot && !saved) || analyzing} />
+          <FullButton
+            label={t('review.save')}
+            onPress={save}
+            disabled={saving || (!slot && !saved && !extraChosen) || analyzing}
+          />
         </>
       }
     >
       {photoUri || barcode ? (
         <View style={styles.top}>
-          {photoUri ? <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" /> : null}
+          {photoUri ? (
+            <>
+              <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
+              {shownPhotos.length > 1 || (!saved && photos.length < MAX_PHOTOS) ? (
+                <View style={styles.thumbs}>
+                  {shownPhotos.slice(1).map((u) => (
+                    <View key={u}>
+                      <Image source={{ uri: u }} style={styles.thumb} resizeMode="cover" />
+                      {saved ? null : (
+                        <Pressable
+                          onPress={() => removePhoto(u)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('review.removePhoto')}
+                          style={styles.thumbX}
+                        >
+                          <X size={14} color={c.bg} strokeWidth={2.4} />
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
+                  {!saved && photos.length < MAX_PHOTOS ? (
+                    <Pressable
+                      onPress={addPhoto}
+                      disabled={analyzing}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [styles.thumb, styles.addThumb, (pressed || analyzing) && styles.pressed]}
+                    >
+                      <Plus size={20} color={c.sub} strokeWidth={1.8} />
+                      <Text style={styles.caption}>{t('review.addPhoto', { n: photos.length, max: MAX_PHOTOS })}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          ) : null}
           {barcode ? (
             <View style={styles.related}>
               {product && typeof product === 'object' ? (
@@ -496,7 +581,11 @@ export default function ReviewScreen() {
         // 수정: 끼니는 바꿀 수 없다 (같은 날·같은 끼니를 덮어쓴다)
         <ListRow
           label={t('review.mealLabel')}
-          value={t('review.mealOf', { month: savedDay.getMonth() + 1, day: savedDay.getDate(), n: saved!.index })}
+          value={t('review.mealOf', {
+            month: savedDay.getMonth() + 1,
+            day: savedDay.getDate(),
+            meal: mealLabel(t, saved!.index),
+          })}
         />
       ) : (
         <View style={styles.mealBlock}>
@@ -505,6 +594,7 @@ export default function ReviewScreen() {
             meals={meals.map((m) => ({ index: m.index, logged: m.state === 'logged' }))}
             value={chosen}
             onChange={setMealIndex}
+            extra={freeExtra}
           />
           {already ? <Text style={styles.caption}>{t('review.overwrite')}</Text> : null}
         </View>
@@ -567,6 +657,27 @@ const makeStyles = (c: Palette) =>
     when: { ...text.caption, color: c.sub, marginBottom: 12 },
     top: { gap: 12 },
     photo: { width: '100%', height: 160, borderRadius: radius.card, backgroundColor: c.card },
+    thumbs: { flexDirection: 'row', gap: 8, marginTop: 8 },
+    thumb: { width: 72, height: 72, borderRadius: radius.field, backgroundColor: c.card },
+    thumbX: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: c.text,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addThumb: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+      borderWidth: layout.hairline,
+      borderColor: c.border,
+      borderStyle: 'dashed',
+    },
     related: { gap: 12 },
     summary: { padding: 20, gap: layout.related },
     analyzing: { flexDirection: 'row', alignItems: 'center', gap: layout.related, paddingVertical: 12 },

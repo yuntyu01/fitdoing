@@ -75,10 +75,19 @@ func (r *Result) Validate(field string) error {
 	return nil
 }
 
-// FoodAnalyzer looks at a meal photo and estimates items, kcal and macros.
-// Implementations are chosen with AI_PROVIDER (mock | gemini). The photo is not stored.
+// Photo is one photo of the meal sent for analysis.
+type Photo struct {
+	Data        []byte
+	ContentType string
+}
+
+// MaxPhotos is how many photos of one meal can go into one analysis.
+const MaxPhotos = 3
+
+// FoodAnalyzer looks at the photos of one meal (1~MaxPhotos) and estimates items, kcal and macros.
+// Implementations are chosen with AI_PROVIDER (mock | gemini). The photos are not stored.
 type FoodAnalyzer interface {
-	Analyze(ctx context.Context, image []byte, contentType string) (Result, error)
+	Analyze(ctx context.Context, photos []Photo) (Result, error)
 }
 
 // New picks the analyzer for a provider name.

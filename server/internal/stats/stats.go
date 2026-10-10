@@ -120,6 +120,12 @@ func (s *Service) Today(userID string, date platform.Date, now string) (Today, e
 			rows = append(rows, Row{Index: slot.Index, Deadline: slot.Deadline})
 		}
 	}
+	// "기타" (snacks outside the plan) has no row but is eaten: it counts in the day's total and what is left
+	for _, m := range ms {
+		if meal.IsExtra(m.Index) {
+			total = total.Plus(meal.NutritionOf(m))
+		}
+	}
 	targets := st.TargetsOn(date)
 	left := remainingPerMeal(targets, total, ahead)
 	for i := range rows {
@@ -140,7 +146,7 @@ func (s *Service) Today(userID string, date platform.Date, now string) (Today, e
 	if err != nil {
 		return Today{}, err
 	}
-	return Today{date, streak, len(logged), len(st.Meals), total, targets, rows, gymWeek, sum}, nil
+	return Today{date, streak, plannedLogged(logged), len(st.Meals), total, targets, rows, gymWeek, sum}, nil
 }
 
 // streak counts consecutive logged days; with nothing logged today it counts back from yesterday.
@@ -198,8 +204,9 @@ func (s *Service) Month(userID, month string) (Month, error) {
 		Date platform.Date
 		N    int
 	}
+	// planned meals only: "기타" doesn't make a day "all logged"
 	if err := s.db.Model(&meal.Log{}).Select("meal_date AS date, COUNT(*) AS n").
-		Where("user_id = ? AND meal_date BETWEEN ? AND ?", userID, from, to).
+		Where("user_id = ? AND meal_date BETWEEN ? AND ? AND meal_index < ?", userID, from, to, meal.ExtraBase).
 		Group("meal_date").Scan(&perDayRows).Error; err != nil {
 		return Month{}, err
 	}
@@ -434,4 +441,15 @@ func remainingPerMeal(t settings.Targets, eaten meal.Nutrition, n int) settings.
 		Kcal: f(t.Kcal, eaten.Kcal), Carbs: f(t.Carbs, eaten.Carbs),
 		Protein: f(t.Protein, eaten.Protein), Fat: f(t.Fat, eaten.Fat),
 	}
+}
+
+// plannedLogged counts the logged planned meals (not "기타").
+func plannedLogged(logged map[int]meal.Log) int {
+	n := 0
+	for i := range logged {
+		if !meal.IsExtra(i) {
+			n++
+		}
+	}
+	return n
 }

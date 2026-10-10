@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yuntyu01/fitdoing/server/internal/meal"
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 	"gorm.io/gorm"
 )
@@ -164,8 +165,8 @@ func slot(r *http.Request) (platform.Date, int, error) {
 		return "", 0, err
 	}
 	idx, err := strconv.Atoi(r.URL.Query().Get("index"))
-	if err != nil || idx < 1 || idx > 6 {
-		return "", 0, platform.Invalid("index", "1~6 사이 숫자여야 해요")
+	if err != nil || idx < 1 || idx > meal.MaxIndex {
+		return "", 0, platform.Invalid("index", "1~9 사이 숫자여야 해요")
 	}
 	return date, idx, nil
 }

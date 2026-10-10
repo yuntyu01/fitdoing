@@ -137,8 +137,8 @@ func TestPhotoBackupRefusals(t *testing.T) {
 	if w := e.upload("/api/meals/photo?date=2026-09-26&index=1", e.tok, "image/jpeg", []byte("not an image at all")); w.Code != 400 {
 		t.Fatalf("text as jpeg: %d", w.Code)
 	}
-	if w := e.upload("/api/meals/photo?date=2026-09-26&index=9", e.tok, "image/jpeg", jpeg); w.Code != 400 {
-		t.Fatalf("index 9: %d", w.Code)
+	if w := e.upload("/api/meals/photo?date=2026-09-26&index=10", e.tok, "image/jpeg", jpeg); w.Code != 400 {
+		t.Fatalf("index 10: %d", w.Code) // 1~6 planned meals, 7~9 "기타"
 	}
 	if w := e.upload("/api/meals/photo?date=2026-09-26&index=1", e.tok, "image/jpeg", bytes.Repeat(jpeg, 6<<20/len(jpeg)+1)); w.Code != 413 {
 		t.Fatalf("too large: %d", w.Code)

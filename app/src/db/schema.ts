@@ -93,6 +93,8 @@ export const mealLogs = sqliteTable(
     index: integer('meal_index').notNull(),
     deadline: text('deadline').notNull(),
     photoUri: text('photo_uri'), // 기기 안 경로. 백업을 켜지 않으면 폰 밖으로 나가지 않는다.
+    // 같은 끼니의 사진 2·3번째 (첫 장은 photoUri). 폰에만 둔다: 서버 사진 백업은 첫 장만.
+    extraPhotoUris: text('extra_photo_uris', { mode: 'json' }).$type<string[]>(),
     barcode: text('barcode'),
     ai: text('ai', { mode: 'json' }).$type<AiResult>(),
     portion: real('portion').notNull().default(1), // 0.25, 0.5, 1, 1.5, 2

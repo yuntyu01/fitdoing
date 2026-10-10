@@ -1,5 +1,6 @@
 import type { AiResult } from '../db/schema';
 import { dayState, type DayFacts, type DayState } from './calendar';
+import { isExtra } from './meals';
 import { sumNutrition, type Nutrition } from './stats';
 import { dateKey } from './time';
 
@@ -15,7 +16,7 @@ export interface MealLogRow {
 export interface MonthInput {
   dates: string[]; // 그 달의 모든 날
   mealsPlanned: number;
-  meals: Pick<MealLogRow, 'date' | 'status'>[];
+  meals: Pick<MealLogRow, 'date' | 'status' | 'index'>[];
   gymDates: string[]; // 인증한 날
   sleepDates: string[];
   lockStartedAt: number[]; // lock_events.started_at (epoch ms)
@@ -26,7 +27,8 @@ export function buildMonthFacts(input: MonthInput): DayFacts[] {
   const logged = new Map<string, number>();
   const lockedDays = new Set<string>();
   for (const m of input.meals) {
-    if (m.status === 'logged') logged.set(m.date, (logged.get(m.date) ?? 0) + 1);
+    // 기타(간식 등)는 "다 찍은 날" 계산에 넣지 않는다
+    if (m.status === 'logged' && !isExtra(m.index)) logged.set(m.date, (logged.get(m.date) ?? 0) + 1);
     if (m.status === 'locked') lockedDays.add(m.date);
   }
   for (const at of input.lockStartedAt) lockedDays.add(dateKey(new Date(at)));

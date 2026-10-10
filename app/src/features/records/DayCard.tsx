@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { router } from 'expo-router';
 
+import { mealLabel } from '../../domain/meals';
 import type { DayDetail } from '../../domain/records';
 import type { Targets } from '../../domain/targets';
 import { TotalsCard } from '../today/components/TotalsCard';
@@ -96,7 +97,7 @@ export function DayCard({
                 </View>
                 <View style={styles.rowText}>
                   <Text style={styles.meta}>
-                    {[t('common.meal', { n: m.index }), clock(m.loggedAt)].filter(Boolean).join(' · ')}
+                    {[mealLabel(t, m.index), clock(m.loggedAt)].filter(Boolean).join(' · ')}
                   </Text>
                   <Text style={[styles.foods, !foods && styles.foodsMuted]} numberOfLines={2}>
                     {foods ?? t('records.noItems')}

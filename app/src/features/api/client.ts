@@ -82,11 +82,14 @@ async function request(path: string, init: RequestInit, timeoutMs: number) {
   }
 }
 
-/** 사진 한 장을 보내 음식 인식 결과를 받는다. photoUri는 이미 긴 변 1024px로 줄인 파일이어야 한다. */
-export async function analyzeMeal(photoUri: string): Promise<AiResult> {
+/**
+ * 한 끼니의 사진(1~3장)을 한 번에 보내 음식 인식 결과를 받는다. 같은 음식이 여러 장에 보여도 서버가 한 번만 센다.
+ * 사진은 이미 긴 변 1024px로 줄인 파일이어야 한다.
+ */
+export async function analyzeMeal(photoUris: string[]): Promise<AiResult> {
   const form = new FormData();
   // expo/fetch의 FormData는 expo-file-system File(Blob)을 파트로 받는다.
-  form.append('photo', new File(photoUri));
+  for (const uri of photoUris) form.append('photo', new File(uri));
   const res = await request('/api/meals/analyze', { method: 'POST', body: form }, ANALYZE_TIMEOUT_MS);
   const data = (await res.json()) as Partial<AiResult>;
   return {

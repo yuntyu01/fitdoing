@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,7 @@ func TestGeminiSendsInlineImageAndParsesSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := g.WithBase(srv.URL).Analyze(context.Background(), []byte{1, 2, 3}, "image/jpeg")
+	res, err := g.WithBase(srv.URL).Analyze(context.Background(), []Photo{{Data: []byte{1, 2, 3}, ContentType: "image/jpeg"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,11 +43,38 @@ func TestGeminiSendsInlineImageAndParsesSchema(t *testing.T) {
 	}
 }
 
+// Several photos of one meal go into one request, after the prompt that says not to count a food twice.
+func TestGeminiSendsAllPhotosOfOneMeal(t *testing.T) {
+	var body struct {
+		Contents []struct {
+			Parts []map[string]any `json:"parts"`
+		} `json:"contents"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"items\":[],\"confidence\":0}"}]}}]}`))
+	}))
+	defer srv.Close()
+	g, _ := NewGemini("k", "m", srv.Client())
+	photos := []Photo{{[]byte{1}, "image/jpeg"}, {[]byte{2}, "image/jpeg"}, {[]byte{3}, "image/png"}}
+	if _, err := g.WithBase(srv.URL).Analyze(context.Background(), photos); err != nil {
+		t.Fatal(err)
+	}
+	parts := body.Contents[0].Parts
+	if len(parts) != 4 || !strings.Contains(parts[0]["text"].(string), "한 번만 세라") {
+		t.Fatalf("parts: %v", parts)
+	}
+	if one := (&Gemini{}).body(photos[:1]); strings.Contains(fmt.Sprint(one), "한 번만 세라") {
+		t.Fatal("a single photo needs no multi-photo instruction")
+	}
+}
+
 func TestGeminiFailureIsBadGateway(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(500) }))
 	defer srv.Close()
 	g, _ := NewGemini("k", "m", srv.Client())
-	_, err := g.WithBase(srv.URL).Analyze(context.Background(), []byte{1}, "image/png")
+	_, err := g.WithBase(srv.URL).Analyze(context.Background(), []Photo{{Data: []byte{1}, ContentType: "image/png"}})
 	if err == nil || !strings.Contains(err.Error(), "인식") {
 		t.Fatalf("got %v", err)
 	}

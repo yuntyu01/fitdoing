@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 
 import { db } from '../../db/client';
 import { gymLogs, mealLogs, type Settings } from '../../db/schema';
-import { deadlinesFor, mealStatuses, scheduleDay } from '../../domain/meals';
+import { deadlinesFor, isExtra, mealStatuses, scheduleDay } from '../../domain/meals';
 import { gymWeek, isGymDay, streak, sumNutrition } from '../../domain/stats';
 import { addDays, dateKey, parseDateKey, weekKey } from '../../domain/time';
 
@@ -65,7 +65,9 @@ export function useToday(settings: Settings, now: Date) {
       day,
       meals,
       current: meals.find((m) => m.state === 'current') ?? null,
-      loggedCount: logged.length,
+      // "N끼 기록"은 계획한 끼니만, 합계는 기타(간식 등)까지 먹은 것 전부
+      loggedCount: logged.filter((l) => !isExtra(l.index)).length,
+      extras: logged.filter((l) => isExtra(l.index)).sort((a, b) => a.index - b.index),
       totals: sumNutrition(logged),
       streak: streak(daySet, now),
       loggedDays: daySet,

@@ -15,6 +15,13 @@
       "when": 1791533519350,
       "tag": "0001_mysterious_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791648221264,
+      "tag": "0002_careful_mastermind",
+      "breakpoints": true
     }
   ]
 }

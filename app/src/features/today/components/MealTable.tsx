@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatNumber, roundGram, roundKcal } from '../../../domain/format';
+import { mealLabel } from '../../../domain/meals';
 import { eatenFactor } from '../../../domain/stats';
 import { remainingPerMeal, type Targets } from '../../../domain/targets';
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
@@ -66,6 +67,26 @@ export function MealTable({ data, targets }: { data: TodayData; targets: Targets
             </Text>
             {(vals ?? [null, null, null, null]).map((v, i) => (
               <Text key={i} style={[styles.td, !ai && styles.muted, missed && styles.faint]}>
+                {v === null ? '-' : formatNumber(v)}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
+      {/* 기타(계획 밖 간식 등): 먹은 만큼만 */}
+      {data.extras.map((l) => {
+        const ai = l.ai;
+        const p = eatenFactor(l.portion ?? 1, l.sharedMeal);
+        const vals = ai
+          ? [roundKcal(ai.kcal * p), roundGram(ai.carbs * p), roundGram(ai.protein * p), roundGram(ai.fat * p)]
+          : [null, null, null, null];
+        return (
+          <View key={l.index} style={styles.row}>
+            <Text style={[styles.first, styles.meal]} numberOfLines={1}>
+              {mealLabel(t, l.index)}
+            </Text>
+            {vals.map((v, i) => (
+              <Text key={i} style={styles.td}>
                 {v === null ? '-' : formatNumber(v)}
               </Text>
             ))}

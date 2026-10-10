@@ -3,6 +3,8 @@ import { Check, Clock, Heart, MessageCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { mealLabel } from '../../../domain/meals';
+
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
 import { fonts, layout, radius, text } from '../../../ui/tokens';
 import { useCheer } from '../data';
@@ -42,7 +44,7 @@ function Entry({ item, first, last }: { item: TimelineItem; first: boolean; last
   const title = post
     ? post.kind === 'gym'
       ? t('friends.gym')
-      : t('common.meal', { n: post.mealIndex })
+      : mealLabel(t, post.mealIndex ?? 0)
     : t('friends.planned', { n: item.kind === 'planned' ? item.mealIndex : 0 });
 
   return (

@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { mealLogs, type AiResult, type Settings } from '../../db/schema';
 import { sanitizeAi, toMealBackup } from '../../domain/logging';
+import { isExtra } from '../../domain/meals';
 import { photoSync } from '../../domain/portion';
 import { backupMeal } from '../api/client';
 import { trackMealPhoto } from '../api/track';
@@ -17,6 +18,8 @@ export interface LogMealInput {
   index: number;
   deadline: string;
   photoUri: string | null; // 이미 문서 디렉터리에 저장된 경로 (수정할 때 사진을 안 바꿨으면 원래 경로)
+  /** 같은 끼니의 2·3번째 사진 (문서 디렉터리 경로). 없으면 빈 배열 */
+  extraPhotoUris?: string[];
   barcode: string | null;
   ai: AiResult; // 합계에는 음식별 먹은 양이 이미 반영돼 있다 (domain/portion mealToSave)
   portion: number;
@@ -47,6 +50,7 @@ export async function logMeal(input: LogMealInput, settings: Settings): Promise<
     index: input.index,
     deadline: input.deadline,
     photoUri: input.photoUri,
+    extraPhotoUris: input.extraPhotoUris?.length ? input.extraPhotoUris : null,
     barcode: input.barcode,
     ai,
     portion: input.portion,
@@ -62,10 +66,12 @@ export async function logMeal(input: LogMealInput, settings: Settings): Promise<
 
   // 사진을 바꿨을 때만 옛 파일을 지운다 (수정에서 사진을 그대로 두면 같은 경로라 남는다).
   if (prev?.photoUri && prev.photoUri !== input.photoUri) deleteStoredPhoto(prev.photoUri);
+  for (const old of prev?.extraPhotoUris ?? []) if (!input.extraPhotoUris?.includes(old)) deleteStoredPhoto(old);
 
   // 찍은 끼니의 예약 알림을 빼고, 떠 있는 알림은 치운다.
   rescheduleNotifications(settings).catch((e) => console.warn('reschedule failed', e));
-  if (!editing) {
+  // 기타(간식 등)는 계획한 끼니가 아니라서 끼니 잠금·마감과 상관없다
+  if (!editing && !isExtra(input.index)) {
     Notifications.dismissAllNotificationsAsync().catch(() => {});
     void notifyMealLogged({ date: input.date, index: input.index, loggedAt });
   }
@@ -89,4 +95,15 @@ export function readLoggedMeal(date: string, index: number) {
     .where(and(eq(mealLogs.date, date), eq(mealLogs.index, index)))
     .get();
   return row && row.status === 'logged' ? row : null;
+}
+
+/** 그날 이미 기록한 끼니 번호들 (기타 번호를 고를 때) */
+export function loggedIndexesOn(date: string): number[] {
+  return db
+    .select({ index: mealLogs.index, status: mealLogs.status })
+    .from(mealLogs)
+    .where(eq(mealLogs.date, date))
+    .all()
+    .filter((r) => r.status === 'logged')
+    .map((r) => r.index);
 }

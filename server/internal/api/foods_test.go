@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,4 +53,27 @@ func TestBarcodeAPI(t *testing.T) {
 	e.do("GET", "/api/foods/barcode/8801234567890", "", "").code(t, 401, "UNAUTHORIZED")
 
 	newFoodsEnv(t, foods.New("", "", "", "")).get("/api/foods/barcode/8801234567890").code(t, 503, "BARCODE_LOOKUP_UNAVAILABLE")
+}
+
+// "기타" (7~9): logged like a meal and eaten (in today's total), but not a planned meal (no row, not counted).
+func TestExtraMealsCountInTotalsNotInPlan(t *testing.T) {
+	e := newEnv(t)
+	e.post("/api/meals", mealBody("2026-09-26", 1, 1, 400, false)).is(t, 200)
+	e.post("/api/meals", mealBody("2026-09-26", 7, 1, 150, false)).is(t, 200) // 기타 1 (a snack)
+	e.post("/api/meals", mealBody("2026-09-26", 10, 1, 100, false)).code(t, 400, "INVALID")
+	r := e.get("/api/today?date=2026-09-26").is(t, 200)
+	r.eq(t, "total.kcal", float64(550))
+	r.eq(t, "loggedCount", float64(1))
+	r.size(t, "rows", 4) // the 4 planned meals only
+	if raw := e.get("/api/meals?date=2026-09-26").is(t, 200).Raw; !strings.Contains(raw, `"index":7,"deadline":""`) {
+		t.Fatalf("기타 must have no deadline: %s", raw)
+	}
+	// a day with only "기타" is not an all-logged day
+	m := e.get("/api/records/month?month=2026-09").is(t, 200)
+	for _, d := range m.Body["days"].([]any) {
+		day := d.(map[string]any)
+		if day["date"] == "2026-09-26" && day["state"] != "partial" {
+			t.Fatalf("day state %v", day)
+		}
+	}
 }

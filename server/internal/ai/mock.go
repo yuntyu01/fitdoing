@@ -16,10 +16,14 @@ var samples = []Result{
 	{[]Item{food("그릭요거트", "1컵", 150, 11, 15, 4), food("바나나", "1개", 110, 27, 2, 1)}, 260, 38, 17, 5, 0.9},
 }
 
-// Mock needs no API key: the same photo always yields the same canned result.
+// Mock needs no API key: the same (first) photo always yields the same canned result.
 type Mock struct{}
 
-func (Mock) Analyze(_ context.Context, image []byte, _ string) (Result, error) {
+func (Mock) Analyze(_ context.Context, photos []Photo) (Result, error) {
+	var image []byte
+	if len(photos) > 0 {
+		image = photos[0].Data
+	}
 	var h int32 = 1 // same hash as java.util.Arrays.hashCode(byte[])
 	for _, b := range image {
 		h = 31*h + int32(int8(b))

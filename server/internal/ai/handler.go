@@ -2,6 +2,7 @@ package ai
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -12,11 +13,11 @@ import (
 
 const (
 	maxPhoto   = 5 << 20
-	maxRequest = 6 << 20
+	maxRequest = MaxPhotos*maxPhoto + 1<<20
 )
 
-// Register adds POST /api/meals/analyze. The app sends a downscaled photo (long side 1024px);
-// the result JSON is returned and the photo is dropped. The model is the one an admin assigned to the user,
+// Register adds POST /api/meals/analyze. The app sends the meal's photos (1~3, each downscaled to long side 1024px)
+// in the "photo" field; one analysis covers them all and the photos are dropped. The model is the one an admin assigned to the user,
 // else the default; the response header X-AI-Model names it.
 func Register(mux *http.ServeMux, models *ModelSet) {
 	mux.HandleFunc("POST /api/meals/analyze", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error { // costs money: login required
@@ -26,11 +27,6 @@ func Register(mux *http.ServeMux, models *ModelSet) {
 		if r.MultipartForm != nil {
 			defer r.MultipartForm.RemoveAll()
 		}
-		var file multipart.File
-		var header *multipart.FileHeader
-		if err == nil {
-			file, header, err = r.FormFile("photo")
-		}
 		if err != nil {
 			var tooBig *http.MaxBytesError
 			if errors.As(err, &tooBig) {
@@ -38,27 +34,27 @@ func Register(mux *http.ServeMux, models *ModelSet) {
 			}
 			return platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
 		}
-		defer file.Close()
-		if header.Size > maxPhoto {
-			return tooLarge()
+		// one meal may come as up to MaxPhotos photos, all in the "photo" field
+		headers := r.MultipartForm.File["photo"]
+		if len(headers) == 0 {
+			return platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
 		}
-		contentType := header.Header.Get("Content-Type")
-		data, err := io.ReadAll(file)
-		if err != nil {
-			var tooBig *http.MaxBytesError
-			if errors.As(err, &tooBig) {
-				return tooLarge()
+		if len(headers) > MaxPhotos {
+			return platform.BadRequest("TOO_MANY_PHOTOS", fmt.Sprintf("사진은 한 번에 %d장까지예요", MaxPhotos))
+		}
+		photos := make([]Photo, 0, len(headers))
+		for _, h := range headers {
+			p, err := readPhoto(h)
+			if err != nil {
+				return err
 			}
-			return platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
-		}
-		if len(data) == 0 || !strings.HasPrefix(contentType, "image/") {
-			return platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
+			photos = append(photos, p)
 		}
 		analyzer, model, err := models.For(uid)
 		if err != nil {
 			return err
 		}
-		res, err := analyzer.Analyze(r.Context(), data, contentType)
+		res, err := analyzer.Analyze(r.Context(), photos)
 		if err != nil {
 			return err
 		}
@@ -69,6 +65,23 @@ func Register(mux *http.ServeMux, models *ModelSet) {
 		platform.JSON(w, http.StatusOK, res)
 		return nil
 	}))
+}
+
+func readPhoto(h *multipart.FileHeader) (Photo, error) {
+	if h.Size > maxPhoto {
+		return Photo{}, tooLarge()
+	}
+	contentType := h.Header.Get("Content-Type")
+	f, err := h.Open()
+	if err != nil {
+		return Photo{}, platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil || len(data) == 0 || !strings.HasPrefix(contentType, "image/") {
+		return Photo{}, platform.BadRequest("INVALID_PHOTO", "사진 파일이 필요해요")
+	}
+	return Photo{Data: data, ContentType: contentType}, nil
 }
 
 func tooLarge() error {
