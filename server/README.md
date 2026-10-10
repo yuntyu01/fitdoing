@@ -43,6 +43,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 | `AI_PROVIDER` | `mock` | `mock` \| `gemini` |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | -, `gemini-3.5-flash-lite` | gemini일 때 필수/선택. `GEMINI_MODEL`은 모든 사용자의 기본 모델. `gemini-2.5-flash`는 이제 404 |
 | `GEMINI_MODELS` | - | (선택) 관리자가 지정할 수 있는 모델을 더할 때만. 기본으로 `gemini-3.5-flash-lite`·`gemini-3.8-flash`는 설정 없이 지정할 수 있다(`platform.BuiltinGeminiModels`) |
+| `KAKAO_REST_API_KEY` | - | (선택) 카카오 개발자 콘솔의 같은 앱 REST API 키. 헬스장 장소 검색(`/api/places/search`). 비우면 검색은 503, 앱은 '지금 위치로 설정'만 보인다 |
 | `ADMIN_PASSWORD` | - | 10자 이상이면 관리자 페이지 `/admin`과 API를 켠다. 비우면 둘 다 404. 바꾸면 기존 관리자 로그인이 모두 풀린다 |
 | `ZONE` | `Asia/Seoul` | 서버 기준 시간대(강도 변경 적용일 등) |
 | `CORS_ORIGINS` | `*` | 쉼표로 구분한 허용 출처. 웹 미리보기용 |
@@ -98,6 +99,7 @@ curl -b admin.jar https://<서버>/api/admin/users
 | POST `/api/auth/login` | `{provider, token}` → `{token, userId, isNew}` (공개) |
 | DELETE `/api/account` | 회원 탈퇴: 계정과 모든 기록 삭제, 204 |
 | GET `/api/targets/recommend?goal=&weightKg=[&heightCm=&age=&sex=&activity=&mode=]` | 목표 추천 (로그인 불필요). 구형 요청(goal·weightKg만)은 예전 체중 기반 값 그대로, 신체 정보를 함께 보내면 2025 KDRI 성인 EER 기반(유지 추정 `maintenanceKcal`과 목표 분리). docs/nutrition-targets.md |
+| GET `/api/places/search?q=&lat=&lng=` | 헬스장 이름으로 장소 검색(카카오 로컬 키워드 검색 대리 호출, 로그인 필요). `lat`·`lng`를 주면 가까운 순. `{places:[{name, address(도로명 우선), lat, lng, category, distanceM}]}`. 키 없음 503 `PLACES_UNAVAILABLE`, 카카오 오류 502 `PLACES_FAILED` |
 | POST `/api/meals/analyze` (multipart `photo`) | 음식 인식 (로그인 필요, 유료 호출) |
 | POST/GET/DELETE `/api/meals` | 끼니 기록(같은 끼니는 덮어쓰기, portion 0.25/0.5/1/1.5/2, 열린 끼니 잠금 해제) |
 | GET `/api/today?date=&time=` | 홈: 합계·식단 표·연속 기록·헬스 주간·쿠폰. `time`(폰 현지 `HH:mm`, 선택)을 주면 마감이 지난 미기록 끼니는 `missed`, 남은 끼니 `target`은 오늘 남은 양 ÷ 남은 끼니 수 |

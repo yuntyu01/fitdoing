@@ -282,8 +282,14 @@
     "locating": "Finding your location",
     "locationDenied": "Location permission is off",
     "locationFailed": "Couldn't find your location. Try again soon",
-    "privacy": "Your location stays on this phone. Coordinates are sent to the device location service (Google) only to look up the address.",
-    "defaultName": "My gym"
+    "privacy": "The location is saved on your phone and in your settings backup. Only finding the address sends the coordinates to the device's location service (Google).",
+    "defaultName": "My gym",
+    "searchLabel": "Find your gym by name",
+    "search": "Search",
+    "searchFailed": "Couldn't search places. Try again later",
+    "noResults": "Nothing found. Try another name, or set it from your location at the gym",
+    "useCurrentHere": "At the gym? Use where you are",
+    "privacySearch": "Your search and rough location go through our server to Kakao only while searching. The gym you pick is saved on your phone and in your settings backup."
   },
   "sleep": { "title": "Sleep", "bedTime": "Bedtime", "wakeTime": "Wake up" },
   "timeSheet": { "title": "Pick a time" },

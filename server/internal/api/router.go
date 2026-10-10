@@ -16,6 +16,7 @@ import (
 	"github.com/yuntyu01/fitdoing/server/internal/lock"
 	"github.com/yuntyu01/fitdoing/server/internal/meal"
 	"github.com/yuntyu01/fitdoing/server/internal/photo"
+	"github.com/yuntyu01/fitdoing/server/internal/places"
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 	"github.com/yuntyu01/fitdoing/server/internal/settings"
 	"github.com/yuntyu01/fitdoing/server/internal/share"
@@ -32,6 +33,7 @@ type Options struct {
 	// given to New, as the default model.
 	AIModels      *ai.ModelSet
 	AdminPassword string           // ADMIN_PASSWORD: enables /admin and /api/admin/* ("" = off)
+	Places        *places.Searcher // gym place search; nil = off (503)
 	Now           func() time.Time // admin session clock (tests); nil = time.Now
 }
 
@@ -81,6 +83,11 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 	}
 	ai.Register(mux, models)
 	admin.Register(mux, db, o.AdminPassword, models, o.Now)
+	searcher := o.Places
+	if searcher == nil {
+		searcher = places.New("", "")
+	}
+	places.Register(mux, searcher)
 	meal.Register(mux, mealSvc)
 	lock.Register(mux, lockSvc)
 	coupon.Register(mux, couponSvc)

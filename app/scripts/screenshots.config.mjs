@@ -89,6 +89,7 @@ export const SCREENS = [
   { route: '/edit/profile', name: 'edit-profile' },
   { route: '/edit/meals', name: 'edit-meals' },
   { route: '/edit/gym', name: 'edit-gym' },
+  { route: '/edit/gym', name: 'gym-place-sheet', actions: (page) => openByText(page, '바디핏짐 성수점') },
   { route: '/edit/sleep', name: 'edit-sleep' },
   { route: '/edit/mode', name: 'edit-mode' },
   // 영양 목표 4단계 (신체·목표 → 활동 → 계산 모드 → 결과). 2~4단계는 1단계에서 이어 들어가야 열린다.

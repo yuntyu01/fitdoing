@@ -39,3 +39,18 @@ export async function currentPlace(): Promise<PlaceResult> {
     return { ok: false, reason: 'failed' };
   }
 }
+
+/**
+ * 장소 검색을 가까운 순으로 정렬할 때 쓰는 대략의 위치. 권한을 새로 묻지 않고, 이미 허용돼 있을 때 마지막으로 알던
+ * 위치만 쓴다(없으면 null — 검색은 정확도 순).
+ */
+export async function roughPosition(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const perm = await Location.getForegroundPermissionsAsync();
+    if (!perm.granted) return null;
+    const pos = await Location.getLastKnownPositionAsync();
+    return pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : null;
+  } catch {
+    return null;
+  }
+}

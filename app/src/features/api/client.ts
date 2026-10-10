@@ -328,3 +328,26 @@ export const enableShare = () => shareCall('POST');
 export const disableShare = () => shareCall('DELETE');
 /** 새 주소로 바꾸기: 예전 링크는 더 이상 열리지 않는다 */
 export const rotateShare = () => shareCall('POST', '/api/share/rotate');
+
+export interface PlaceHit {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  category: string;
+  distanceM: number | null;
+}
+
+/**
+ * 헬스장 이름으로 장소 검색 (서버가 카카오 장소 검색을 대신 부른다). near 가 있으면 가까운 순.
+ * 서버에 검색 키가 없으면 ApiError(503).
+ */
+export async function searchPlaces(q: string, near?: { lat: number; lng: number } | null): Promise<PlaceHit[]> {
+  const params = new URLSearchParams({ q });
+  if (near) {
+    params.set('lat', near.lat.toFixed(4));
+    params.set('lng', near.lng.toFixed(4));
+  }
+  const body = await getJson<{ places: PlaceHit[] }>(`/api/places/search?${params.toString()}`);
+  return body.places;
+}

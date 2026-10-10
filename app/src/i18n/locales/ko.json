@@ -282,8 +282,14 @@
     "locating": "위치를 찾고 있어요",
     "locationDenied": "위치 권한이 없어서 설정하지 못했어요",
     "locationFailed": "위치를 찾지 못했어요. 잠시 후 다시 해 주세요",
-    "privacy": "위치는 폰에만 저장돼요. 주소를 찾을 때만 좌표가 기기의 위치 서비스(Google)로 전송돼요.",
-    "defaultName": "내 헬스장"
+    "privacy": "위치는 폰과 내 설정 백업에 저장돼요. 주소를 찾을 때만 좌표가 기기의 위치 서비스(Google)로 전송돼요.",
+    "defaultName": "내 헬스장",
+    "searchLabel": "헬스장 이름으로 찾기",
+    "search": "검색",
+    "searchFailed": "장소를 찾지 못했어요. 잠시 뒤 다시 해 주세요",
+    "noResults": "찾는 곳이 없어요. 이름을 바꿔 보거나 헬스장에서 지금 위치로 설정해 주세요",
+    "useCurrentHere": "헬스장에 있다면 지금 위치로 설정",
+    "privacySearch": "검색어와 대략의 위치는 장소를 찾을 때만 서버를 거쳐 카카오로 보내요. 고른 헬스장 위치는 폰과 내 설정 백업에만 저장돼요."
   },
   "sleep": { "title": "취침", "bedTime": "취침", "wakeTime": "기상" },
   "timeSheet": { "title": "시간 선택" },

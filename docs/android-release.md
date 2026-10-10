@@ -36,6 +36,7 @@ Settings > Secrets and variables > Actions > Variables. 바꾼 뒤 다시 빌드
 | `AUTH_DISABLED` | `1` (앱의 `EXPO_PUBLIC_AUTH_DISABLED=1` 과 짝) |
 | `AI_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` | `gemini`, 키, `gemini-3.5-flash-lite` (기본 모델) |
 | `ADMIN_PASSWORD` | 관리자 페이지(`/admin`) 비밀번호, 10자 이상. 사용자별 AI 모델(3.5 flash-lite / 3.8 flash) 지정에 쓴다. server/README.md "관리자 페이지 · API" |
+| `KAKAO_REST_API_KEY` | 카카오 개발자 콘솔 > 내 애플리케이션 > 앱 키 > REST API 키. 헬스장 이름 검색에 쓴다(없으면 지금 위치로만 설정) |
 | `PUBLIC_BASE_URL` | 서버의 공개 주소 (공유 페이지 링크) |
 | `PHOTO_STORE` (+ R2 값들) | 사진 백업·친구 사진을 쓰려면 `r2` |
 
