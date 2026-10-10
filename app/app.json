@@ -18,7 +18,8 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "allowBackup": false
     },
     "plugins": [
       "expo-router",
@@ -50,11 +51,12 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "헬스장 위치를 정하고 도착을 확인할 때 위치를 써요. 주소 조회에는 기기의 위치 서비스를 사용해요."
+          "locationWhenInUsePermission": "헬스장 위치를 정하고 도착을 확인할 때 위치를 써요."
         }
       ],
       "expo-secure-store",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "./plugins/withLocalDataProtection"
     ],
     "experiments": {
       "typedRoutes": true

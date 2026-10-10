@@ -71,9 +71,9 @@ export function GymPlaceSheet({ visible, value, onClose, onConfirm }: Props) {
           {busy ? <ActivityIndicator color={c.text} /> : <MapPin size={20} color={c.text} strokeWidth={1.8} />}
           <View style={styles.locateText}>
             <Text style={styles.locateLabel}>{busy ? t('gym.locating') : t('gym.useCurrent')}</Text>
-            {draft.address ? (
+            {canSave ? (
               <Text style={styles.caption} numberOfLines={2}>
-                {draft.address}
+                {draft.address || `${draft.lat?.toFixed(5)}, ${draft.lng?.toFixed(5)}`}
               </Text>
             ) : null}
           </View>

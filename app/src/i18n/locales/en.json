@@ -89,7 +89,7 @@
     "locating": "Finding your location",
     "locationDenied": "Location permission is off",
     "locationFailed": "Couldn't find your location. Try again soon",
-    "privacy": "Your location stays on this phone. Coordinates are sent to the device location service (Google) only to look up the address.",
+    "privacy": "Coordinates are saved in the app without sending them for address lookup. Device location services follow your operating system settings and policies.",
     "defaultName": "My gym"
   },
   "sleep": { "title": "Sleep", "bedTime": "Bedtime", "wakeTime": "Wake up" },
@@ -126,6 +126,8 @@
   "sync": { "title": "Server sync", "never": "Not yet", "last": "{{time}}", "pending": "{{n}} waiting" },
   "settings": {
     "support": "Support",
+    "localPhotoNote": "This version saves photos and records in the app. AI analysis, server backup and friend sharing are unavailable. Android automatic backup and device migration are disabled.",
+    "privacyPolicy": "Privacy policy",
     "serverUnavailable": "No server connection",
     "localBuildNote": "This test build stores records on your device. AI analysis, backup and sharing with friends require a server and are unavailable in this build.",
     "sectionPlan": "My plan",
@@ -331,7 +333,7 @@
     "leave": "Stop",
     "barcodeLabel": "Barcode {{code}}",
     "barcodeNote": "We can't look up nutrition from a barcode yet. Please enter it yourself",
-    "photoNote": "The photo stays on this phone. It is only sent, shrunk down, to the server to recognize the food, and the server doesn't keep it.",
+    "photoNote": "This version saves photos in the app without server analysis. You can enter nutrition information manually.",
     "photoNoteShared": "For a meal shared with friends, a shrunk copy of the photo is stored on the server so friends can see it. Log it again without sharing to remove it.",
     "photoNoteBackup": "Photo backup is on, so a shrunk copy of the photo is also stored on the server.",
     "photoNoteBackupShared": "Photo backup is on, so a shrunk copy of the photo is stored on the server, and friends you share with can see it.",

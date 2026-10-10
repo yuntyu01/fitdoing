@@ -92,6 +92,10 @@ export default function SettingsScreen() {
     void Linking.openURL('https://midi-broccoli-56c.notion.site/FitDoing-3f4502846708812981c9db286d1eef63')
       .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
   };
+  const openPrivacy = () => {
+    void Linking.openURL('https://midi-broccoli-56c.notion.site/3f450284670881b880e6fd67ba899903')
+      .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
+  };
 
   const confirmLogout = () =>
     Alert.alert(t('settings.logoutTitle'), t('settings.logoutBody'), [
@@ -172,7 +176,7 @@ export default function SettingsScreen() {
 
         <Section
           title={t('settings.sectionApp')}
-          note={`${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}`}
+          note={SERVER_CONFIGURED ? `${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}` : t('settings.localPhotoNote')}
         >
           <ListRow
             label={t('settings.coupons')}
@@ -205,6 +209,7 @@ export default function SettingsScreen() {
 
         <Section title={t('settings.support')} note={SERVER_CONFIGURED ? undefined : t('settings.localBuildNote')}>
           <ListRow label={t('settings.support')} value="yuntyu01@gmail.com" onPress={openSupport} />
+          <ListRow label={t('settings.privacyPolicy')} onPress={openPrivacy} />
         </Section>
 
         {/* 로그인 없는 빌드(비공개 테스트)에는 로그아웃할 계정이 없다: 누르면 로그인 화면에 갇힌다 */}

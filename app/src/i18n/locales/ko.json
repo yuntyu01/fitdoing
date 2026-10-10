@@ -89,7 +89,7 @@
     "locating": "위치를 찾고 있어요",
     "locationDenied": "위치 권한이 없어서 설정하지 못했어요",
     "locationFailed": "위치를 찾지 못했어요. 잠시 후 다시 해 주세요",
-    "privacy": "위치는 폰에만 저장돼요. 주소를 찾을 때만 좌표가 기기의 위치 서비스(Google)로 전송돼요.",
+    "privacy": "좌표는 앱에 저장하며, 주소 조회를 위해 외부로 보내지 않아요. 기기의 위치 서비스에는 운영체제의 설정과 정책이 적용돼요.",
     "defaultName": "내 헬스장"
   },
   "sleep": { "title": "취침", "bedTime": "취침", "wakeTime": "기상" },
@@ -126,6 +126,8 @@
   "sync": { "title": "서버 동기화", "never": "아직 안 함", "last": "{{time}}", "pending": "대기 {{n}}건" },
   "settings": {
     "support": "고객지원",
+    "localPhotoNote": "이 버전은 사진과 기록을 앱에 저장해요. AI 분석·서버 백업·친구 공유는 사용할 수 없어요. Android 자동 백업과 기기 이전도 사용하지 않아요.",
+    "privacyPolicy": "개인정보처리방침",
     "serverUnavailable": "서버 미연결",
     "localBuildNote": "이 테스트 버전은 기기에 기록을 저장해요. 서버 연결이 필요한 AI 분석·백업·친구 공유는 사용할 수 없어요.",
     "sectionPlan": "내 계획",
@@ -331,7 +333,7 @@
     "leave": "그만하기",
     "barcodeLabel": "바코드 {{code}}",
     "barcodeNote": "바코드로는 영양 정보를 찾지 못해요. 직접 입력해 주세요",
-    "photoNote": "사진은 폰에만 저장돼요. 음식을 알아볼 때만 줄여서 서버로 보내고, 서버에는 남기지 않아요.",
+    "photoNote": "이 버전은 사진을 앱에 저장하고 서버 분석을 사용하지 않아요. 영양 정보는 직접 입력할 수 있어요.",
     "photoNoteShared": "친구에게 공유한 끼니는 친구가 볼 수 있게 줄인 사진을 서버에 저장해요. 공유를 끄고 다시 기록하면 서버에서 지워요.",
     "photoNoteBackup": "사진 백업이 켜져 있어서 줄인 사진이 서버에도 저장돼요.",
     "photoNoteBackupShared": "사진 백업이 켜져 있어서 줄인 사진이 서버에 저장되고, 공유한 친구도 볼 수 있어요.",

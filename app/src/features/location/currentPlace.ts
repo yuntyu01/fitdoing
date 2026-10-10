@@ -8,8 +8,7 @@ export type PlaceResult =
 
 /**
  * 지금 위치를 헬스장 위치로 쓴다.
- * 개인정보: 좌표는 폰(로컬 DB)에만 저장한다. 다만 주소를 찾는 역지오코딩은
- * Android 기기 위치 서비스(Google)로 좌표를 보낸다. 우리 서버로는 보내지 않는다.
+ * 좌표는 로컬에 저장하며, 주소 조회를 위한 역지오코딩은 하지 않는다.
  */
 export async function currentPlace(): Promise<PlaceResult> {
   const perm = await Location.requestForegroundPermissionsAsync();
@@ -23,18 +22,7 @@ export async function currentPlace(): Promise<PlaceResult> {
       ])) ?? (await Location.getLastKnownPositionAsync());
     if (!pos) return { ok: false, reason: 'failed' };
     const { latitude: lat, longitude: lng } = pos.coords;
-    let address = '';
-    try {
-      const [a] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-      if (a) {
-        address =
-          a.formattedAddress ??
-          [a.region, a.city, a.district, a.street, a.streetNumber].filter(Boolean).join(' ');
-      }
-    } catch {
-      // 주소를 못 찾아도 좌표만 있으면 지오펜스는 된다.
-    }
-    return { ok: true, lat, lng, address };
+    return { ok: true, lat, lng, address: '' };
   } catch {
     return { ok: false, reason: 'failed' };
   }
