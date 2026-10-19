@@ -19,6 +19,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable_social_login:
+        description: "Build with Google/Kakao login (requires configured provider IDs)"
+        required: false
+        default: false
+        type: boolean
   # main 에 앱 코드가 바뀌어 푸시되면 비공개 테스트(alpha) 트랙으로 자동으로 올린다.
   # v0.1.0 같은 태그를 밀어도 alpha 로 올린다(버전 이름 = 태그).
   push:
@@ -51,12 +56,16 @@ jobs:
     #   EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY, EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID  로그인을 켤 때
     env:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
-      EXPO_PUBLIC_AUTH_DISABLED: ${{ vars.EXPO_PUBLIC_AUTH_DISABLED }}
+      EXPO_PUBLIC_AUTH_DISABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_social_login && '0' || vars.EXPO_PUBLIC_AUTH_DISABLED }}
       EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY: ${{ vars.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY }}
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate login configuration
+        run: node scripts/validate-login-config.cjs
 
       # Four React Native ABIs need more disk than the hosted image leaves free.
       # These preinstalled toolchains are unused by this Android-only job.

@@ -28,5 +28,15 @@ module.exports = ({ config }) => {
     );
   }
 
+  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  if (googleIosClientId) {
+    if (!/^[\w-]+\.apps\.googleusercontent\.com$/.test(googleIosClientId)) {
+      throw new Error('Invalid EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID');
+    }
+    plugins.push(['@react-native-google-signin/google-signin', {
+      iosUrlScheme: `com.googleusercontent.apps.${googleIosClientId.split('.')[0]}`,
+    }]);
+  }
+
   return { ...config, plugins };
 };

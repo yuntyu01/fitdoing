@@ -8,6 +8,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,44 @@ type Store interface {
 	Put(ctx context.Context, key string, data []byte, contentType string) error
 	Get(ctx context.Context, key string) ([]byte, error)
 	Delete(ctx context.Context, key string) error // deleting a missing key is not an error
+}
+
+// PrefixLister permits deletion of old unreferenced objects belonging to one account.
+type PrefixLister interface {
+	ListPrefix(context.Context, string) ([]string, error)
+}
+
+func (f FileStore) ListPrefix(ctx context.Context, prefix string) ([]string, error) {
+	p, err := f.path(prefix)
+	if err != nil {
+		return nil, err
+	}
+	var keys []string
+	err = filepath.WalkDir(p, func(path string, entry os.DirEntry, walkErr error) error {
+		if errors.Is(walkErr, os.ErrNotExist) {
+			return nil
+		}
+		if walkErr != nil {
+			return walkErr
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(f.Dir, path)
+		if err != nil {
+			return err
+		}
+		key := filepath.ToSlash(rel)
+		if !strings.HasPrefix(key, prefix) {
+			return errors.New("photo listing escaped ownership prefix")
+		}
+		keys = append(keys, key)
+		return nil
+	})
+	return keys, err
 }
 
 // FileStore writes under a local directory (development, single-server deploys with a volume).
@@ -91,7 +130,66 @@ func (s *R2Store) client() *http.Client {
 	if s.HTTP != nil {
 		return s.HTTP
 	}
-	return http.DefaultClient
+	return &http.Client{Timeout: 20 * time.Second}
+}
+
+func (s *R2Store) ListPrefix(ctx context.Context, prefix string) ([]string, error) {
+	var keys []string
+	continuation := ""
+	for {
+		u, err := url.Parse(strings.TrimRight(s.Endpoint, "/") + "/" + s.Bucket + "/")
+		if err != nil {
+			return nil, err
+		}
+		q := u.Query()
+		q.Set("list-type", "2")
+		q.Set("prefix", prefix)
+		if continuation != "" {
+			q.Set("continuation-token", continuation)
+		}
+		u.RawQuery = q.Encode()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil, err
+		}
+		now := time.Now
+		if s.now != nil {
+			now = s.now
+		}
+		sum := sha256.Sum256(nil)
+		signV4(req, hex.EncodeToString(sum[:]), s.AccessKey, s.SecretKey, s.Region, now().UTC())
+		res, err := s.client().Do(req)
+		if err != nil {
+			return nil, err
+		}
+		var page struct {
+			Contents  []struct{ Key string } `xml:"Contents"`
+			Truncated bool                   `xml:"IsTruncated"`
+			Next      string                 `xml:"NextContinuationToken"`
+		}
+		if res.StatusCode != 200 {
+			_ = res.Body.Close()
+			return nil, fmt.Errorf("r2 list: status %d", res.StatusCode)
+		}
+		err = xml.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(&page)
+		_ = res.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range page.Contents {
+			if !strings.HasPrefix(o.Key, prefix) {
+				return nil, errors.New("r2 listing escaped ownership prefix")
+			}
+			keys = append(keys, o.Key)
+		}
+		if !page.Truncated {
+			return keys, nil
+		}
+		if page.Next == "" || page.Next == continuation {
+			return nil, errors.New("invalid r2 listing pagination")
+		}
+		continuation = page.Next
+	}
 }
 
 func (s *R2Store) do(ctx context.Context, method, key string, body []byte, contentType string) (*http.Response, error) {

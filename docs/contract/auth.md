@@ -21,10 +21,13 @@
 { "token": "<서버 로그인 토큰>", "userId": "<uuid>", "isNew": true }
 ```
 - 같은 제공자 계정으로 다시 로그인하면 같은 `userId`가 나온다. `isNew`는 이번에 처음 만들어진 계정일 때만 true.
+- 기존 테스트 빌드 전환에서는 저장된 `legacyDeviceToken`을 선택적으로 보낼 수 있다. `AUTH_DISABLED=1` 호환 서버에서 제공자 인증을 먼저 통과한 뒤 해당 기기 소유의 익명 기록을 연결한다. 다른 계정에 연결된 ID와 충돌하면 409 `ACCOUNT_LINK_CONFLICT`이며 자동 합치기·삭제를 하지 않는다. 공유 `dev` 계정은 연결 대상이 아니다.
 - 제공자 토큰이 틀렸거나 만료됐거나 우리 앱용이 아니면 401 `{ "code": "AUTH_FAILED", "message": "..." }`.
 - provider가 셋 중 하나가 아니거나 token이 비면 400 `INVALID`.
 
 ## 인증이 필요한 요청
+
+`GET /api/auth/providers`는 공개 설정 상태 `{google: boolean, kakao: boolean}`를 반환한다. ID·키·비밀키와 실제 사용자 로그인 실적을 공개하지 않는다.
 
 `/api/auth/login`, `/healthz`, `/api/targets/recommend` 를 뺀 **모든 `/api/*`** 는 헤더가 필요하다.
 

@@ -34,6 +34,7 @@ type Verifier interface {
 
 // ErrNotConfigured means the server has no keys for that provider.
 var ErrNotConfigured = errors.New("provider not configured")
+var ErrUnknownKeyID = errors.New("unknown key id")
 
 // ---- Google / Apple: OpenID Connect ID tokens (RS256, public keys from the provider's JWKS) ----
 
@@ -53,6 +54,8 @@ type IDTokenVerifier struct {
 	keys    map[string]*rsa.PublicKey
 	fetched time.Time
 }
+
+func (v *IDTokenVerifier) Configured() bool { return len(v.Audiences) > 0 }
 
 type jwk struct {
 	Kid string `json:"kid"`
@@ -120,7 +123,7 @@ func (v *IDTokenVerifier) key(ctx context.Context, kid string) (*rsa.PublicKey, 
 	if k, ok := v.keys[kid]; ok {
 		return k, nil
 	}
-	return nil, errors.New("unknown key id")
+	return nil, ErrUnknownKeyID
 }
 
 func (v *IDTokenVerifier) Verify(ctx context.Context, token string) (string, error) {
@@ -202,6 +205,8 @@ type KakaoVerifier struct {
 	URL    string
 	Client *http.Client
 }
+
+func (v *KakaoVerifier) Configured() bool { return v.AppID != "" }
 
 func (v *KakaoVerifier) Verify(ctx context.Context, token string) (string, error) {
 	if v.AppID == "" {
