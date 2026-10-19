@@ -2,7 +2,7 @@
 
 The app uses native Google and Kakao SDKs, with provider tokens verified by its own Go server. Google ID tokens are checked against provider public keys, issuer, audience and expiry. Kakao access tokens are checked with Kakao and must belong to app 1604237. No account linking by email or display name is performed.
 
-`npm ci` runs `scripts/configure-kakao-sdk.cjs` to set the wrapper's Android SDK metadata to 2.25.0 and library compile/target SDK 36. This follows Kakao's [2026-08-18 security/stability update](https://devtalk.kakao.com/t/151205), which covers native Android SDK versions 2.24.0 and below. The React Native wrapper remains pinned through the existing lockfile. No generated Android files are hand-edited.
+The core and user React Native modules use version 3.0.0, which declares Kakao Android SDK 2.25.0 and supports its removed legacy APIs. This follows Kakao's [2026-08-18 security/stability update](https://devtalk.kakao.com/t/151205), which covers native Android SDK versions 2.24.0 and below. Versions are pinned through the lockfile, with no native SDK metadata override or generated Android files edited by hand.
 
 ## Configuration
 
