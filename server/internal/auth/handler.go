@@ -6,16 +6,23 @@ import (
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 )
 
-func Register(mux *http.ServeMux, svc *Service) {
+func Register(mux *http.ServeMux, svc *Service, allowDeviceUpgrade ...bool) {
+	mux.HandleFunc("GET /api/auth/providers", func(w http.ResponseWriter, r *http.Request) {
+		platform.JSON(w, http.StatusOK, svc.Providers())
+	})
 	mux.HandleFunc("POST /api/auth/login", platform.Handle(func(w http.ResponseWriter, r *http.Request) error {
 		var b struct {
-			Provider Provider `json:"provider"`
-			Token    string   `json:"token"`
+			Provider          Provider `json:"provider"`
+			Token             string   `json:"token"`
+			LegacyDeviceToken string   `json:"legacyDeviceToken"`
 		}
 		if err := platform.Decode(w, r, &b); err != nil {
 			return err
 		}
-		res, err := svc.Login(r.Context(), b.Provider, b.Token)
+		if len(allowDeviceUpgrade) == 0 || !allowDeviceUpgrade[0] {
+			b.LegacyDeviceToken = ""
+		}
+		res, err := svc.LoginWithDevice(r.Context(), b.Provider, b.Token, b.LegacyDeviceToken)
 		if err != nil {
 			return err
 		}

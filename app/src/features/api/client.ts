@@ -150,10 +150,11 @@ export async function lookupBarcode(
 export async function loginToServer(
   provider: Provider,
   token: string,
+  legacyDeviceToken?: string | null,
 ): Promise<{ token: string; userId: string; isNew: boolean }> {
   const res = await request(
     '/api/auth/login',
-    { method: 'POST', body: JSON.stringify({ provider, token }), json: true, anonymous: true },
+    { method: 'POST', body: JSON.stringify({ provider, token, ...(legacyDeviceToken ? { legacyDeviceToken } : {}) }), json: true, anonymous: true },
     BACKUP_TIMEOUT_MS,
   );
   const data = (await res.json()) as { token?: string; userId?: string; isNew?: boolean };

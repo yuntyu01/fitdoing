@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 
 const KAKAO_NATIVE_APP_KEY = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ?? '';
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
 
 const codeOf = (e: unknown): string | undefined => (e as { code?: string } | null)?.code;
 
@@ -40,7 +41,8 @@ export async function loginWithGoogle(): Promise<string | null> {
   if (!googleReady) {
     if (!GOOGLE_WEB_CLIENT_ID) throw new Error('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set');
     // 서버가 검증하는 ID 토큰의 audience 가 이 웹 클라이언트 ID 다.
-    GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+    if (Platform.OS === 'ios' && !GOOGLE_IOS_CLIENT_ID) throw new Error('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID is not set');
+    GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID, ...(GOOGLE_IOS_CLIENT_ID ? { iosClientId: GOOGLE_IOS_CLIENT_ID } : {}) });
     googleReady = true;
   }
   try {

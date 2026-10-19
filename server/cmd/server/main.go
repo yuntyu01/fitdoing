@@ -61,7 +61,7 @@ func run() error {
 		auth.Apple:  auth.NewApple(cfg.AppleClientID),
 	}, nil)
 	if cfg.AuthDisabled {
-		slog.Warn("AUTH_DISABLED=1: 로그인 없이 모든 요청을 dev-user 로 처리해요 (개발 전용)")
+		slog.Warn("AUTH_DISABLED=1: legacy test devices and verified provider sessions accepted; upgraded device tokens retired")
 	}
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,

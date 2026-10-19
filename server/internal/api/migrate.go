@@ -1,7 +1,7 @@
 package api
 
 import (
-	"log/slog"
+	"errors"
 
 	"github.com/yuntyu01/fitdoing/server/internal/ai"
 	"github.com/yuntyu01/fitdoing/server/internal/auth"
@@ -16,12 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// legacyTables are the tables of the device-keyed schema (before login), children first.
-var legacyTables = []string{
-	"meal_items", "meal_logs", "lock_events", "coupon_uses", "gym_logs", "sleep_logs",
-	"allowed_apps", "gym_days", "meal_slots", "user_settings", "devices",
-}
-
 // isLegacy reports whether the database still has the device-keyed schema (owner column device_id, table devices).
 func isLegacy(m gorm.Migrator) bool {
 	return m.HasTable("devices") ||
@@ -29,19 +23,11 @@ func isLegacy(m gorm.Migrator) bool {
 		(m.HasTable("user_settings") && !m.HasColumn("user_settings", "user_id"))
 }
 
-// Migrate creates or updates the tables. A database from before the login (data keyed by a per-phone device id,
-// which cannot be tied to an account) is emptied: its tables are dropped and created again.
+// Migrate creates or updates the tables. Legacy data requires a reviewed migration; never discard it on startup.
 func Migrate(db *gorm.DB) error {
 	m := db.Migrator()
 	if isLegacy(m) {
-		slog.Warn("device-keyed tables found, dropping them (data of the pre-login schema is discarded)")
-		for _, t := range legacyTables {
-			if m.HasTable(t) {
-				if err := m.DropTable(t); err != nil {
-					return err
-				}
-			}
-		}
+		return errors.New("legacy device-keyed database found: preserve data and run a reviewed migration before starting this version")
 	}
 	// users first, every other table references it
 	models := append(auth.Models(), settings.Models()...)

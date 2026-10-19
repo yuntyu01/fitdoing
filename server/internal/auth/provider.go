@@ -54,6 +54,8 @@ type IDTokenVerifier struct {
 	fetched time.Time
 }
 
+func (v *IDTokenVerifier) Configured() bool { return len(v.Audiences) > 0 }
+
 type jwk struct {
 	Kid string `json:"kid"`
 	Kty string `json:"kty"`
@@ -202,6 +204,8 @@ type KakaoVerifier struct {
 	URL    string
 	Client *http.Client
 }
+
+func (v *KakaoVerifier) Configured() bool { return v.AppID != "" }
 
 func (v *KakaoVerifier) Verify(ctx context.Context, token string) (string, error) {
 	if v.AppID == "" {
