@@ -667,7 +667,7 @@
     "apple": "Continue with Apple",
     "busy": "Signing in...",
     "failed": "Couldn't sign in. Please try again in a moment.",
-    "conflict": "Your records were kept unchanged because this sign-in belongs to a different account. Try the account originally linked on this device.",
+    "conflict": "Your records were left unchanged. Choose another account or contact support to resolve the account conflict.",
     "note": "Sign in to back up your records to the server. You can pick up where you left off on a new phone."
   },
   "friends": {
