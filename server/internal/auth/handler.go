@@ -2,11 +2,13 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/yuntyu01/fitdoing/server/internal/platform"
 )
 
 func Register(mux *http.ServeMux, svc *Service, allowDeviceUpgrade ...bool) {
+	registerKakaoEvents(mux, svc)
 	mux.HandleFunc("GET /api/auth/providers", func(w http.ResponseWriter, r *http.Request) {
 		platform.JSON(w, http.StatusOK, svc.Providers())
 	})
@@ -30,6 +32,11 @@ func Register(mux *http.ServeMux, svc *Service, allowDeviceUpgrade ...bool) {
 		return nil
 	}))
 	mux.HandleFunc("DELETE /api/account", platform.WithUser(func(w http.ResponseWriter, r *http.Request, uid string) error {
+		if len(allowDeviceUpgrade) > 0 && allowDeviceUpgrade[0] {
+			if err := svc.retireDeletedDevice(uid, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")); err != nil {
+				return err
+			}
+		}
 		if err := svc.DeleteAccount(uid); err != nil {
 			return err
 		}

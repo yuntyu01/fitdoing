@@ -2,8 +2,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"os"
@@ -60,8 +62,35 @@ func run() error {
 		auth.Google: auth.NewGoogle(cfg.GoogleClientIDs),
 		auth.Apple:  auth.NewApple(cfg.AppleClientID),
 	}, nil)
+	authSvc.KakaoEvents = auth.NewKakaoEventVerifier(cfg.KakaoAppID, cfg.KakaoRESTKey)
 	if cfg.AuthDisabled {
 		slog.Warn("AUTH_DISABLED=1: legacy test devices and verified provider sessions accepted; upgraded device tokens retired")
+	}
+	storedPhotos := photoStore(cfg)
+	if lister, ok := storedPhotos.(photo.PrefixLister); ok {
+		probeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, probeErr := lister.ListPrefix(probeCtx, "u/__fitdoing_capability_probe__/")
+		cancel()
+		slog.Info("photo prefix cleanup capability", "available", probeErr == nil)
+		// Only a newly generated, non-user probe object is written and removed.
+		probeKey := "u/__fitdoing_capability_probe__/probe_" + uuid.NewString() + ".bin"
+		probeData := []byte("fitdoing storage capability check")
+		probeCtx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		writeErr := storedPhotos.Put(probeCtx, probeKey, probeData, "application/octet-stream")
+		var readData []byte
+		var readErr error
+		if writeErr == nil {
+			readData, readErr = storedPhotos.Get(probeCtx, probeKey)
+		}
+		cancel()
+		deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		deleteErr := storedPhotos.Delete(deleteCtx, probeKey)
+		var missingErr error
+		if deleteErr == nil {
+			_, missingErr = storedPhotos.Get(deleteCtx, probeKey)
+		}
+		deleteCancel()
+		slog.Info("isolated photo storage roundtrip", "available", writeErr == nil && readErr == nil && bytes.Equal(readData, probeData) && deleteErr == nil && errors.Is(missingErr, photo.ErrNotFound))
 	}
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
@@ -71,11 +100,14 @@ func run() error {
 			AdminPassword: cfg.AdminPassword,
 			Places:        places.New(cfg.KakaoRESTKey, cfg.KakaoLocalURL),
 			Foods:         foods.New(cfg.FoodSafetyKey, cfg.DataGoKrKey, cfg.FoodSafetyURL, cfg.DataGoKrURL),
-			PhotoStore:    photoStore(cfg),
+			PhotoStore:    storedPhotos,
 			PublicURL:     cfg.PublicURL,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	workerContext, cancelWorker := context.WithCancel(context.Background())
+	defer cancelWorker()
+	go authSvc.RunKakaoDeletions(workerContext)
 	go func() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

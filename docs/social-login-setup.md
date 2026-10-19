@@ -12,6 +12,16 @@ The core and user React Native modules use version 3.0.0, which declares Kakao A
 - Register `com.fitdoing.app` and the actual Play app-signing SHA-1 in a Google Android OAuth client. Kakao needs the matching certificate SHA-1 encoded as Base64. Register upload/debug certificates separately if those builds need login; never substitute an upload certificate for Play app signing.
 - `GET /api/auth/providers` returns configuration booleans only. A true value proves server configuration, not a real user sign-in.
 
+## Kakao account events and deletion
+
+`POST /api/auth/kakao/events` accepts Kakao SETs (`application/secevent+jwt`). It checks RS256 signatures against the fixed Kakao JWKS endpoint, the exact issuer, the primary REST-key audience, the app ID when provided, event timestamps and member subject. Only OAuth User Unlinked and Tokens Revoked need to be subscribed; no Admin key, RISC/CAEP permissions or additional personal-information scopes are used. Validation failures use RFC 8935 errors. Delivery/network/database failures are retried by the sender, while successful persistence is acknowledged with 202 within the request deadline.
+
+Token revocation increments the account's session version. An unlinked Kakao-only account is blocked immediately and durably queued for data/file deletion. Other linked providers, if present, keep their data while the Kakao identity is removed. Hashed event receipts prevent replay and are automatically removed after 30 days. A delayed event for an older account does not target a subsequently recreated account. Unprocessed cleanup requests survive restarts; failed storage deletion retries with backoff up to one hour and is never silently discarded.
+
+Authenticated account deletion also blocks access and retains a durable cleanup request before touching files. The existing 204 response means account access is removed; storage cleanup can remain queued during a provider outage. Replaced photos, uncertain upload outcomes and in-flight uploads are tracked until their objects are removed. R2/FileStore account cleanup lists only `u/<internal-user-id>/`, including old unreferenced objects. A startup capability check uses one newly generated, non-user probe object; it never deletes an existing user's data. This does not verify the hosting provider's log/backup retention or backup-restore deletion replay.
+
+Provider-side consent removal initiated from the app itself is a separate client-side unlink step and is not claimed as verified by these incoming-webhook checks. Physical login, real external unlink delivery and the connected-build privacy/Data safety disclosures still need checking before store distribution.
+
 ## Existing test records
 
 The currently configured `AUTH_DISABLED=1` compatibility mode accepts old random per-install device tokens and verifies real signed sessions separately. Invalid signed sessions never fall back to anonymous access. Do not change the existing server secret when adding providers.

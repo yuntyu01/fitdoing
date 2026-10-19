@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -32,7 +33,9 @@ type Identity struct {
 func (Identity) TableName() string { return "identities" }
 
 // Models lists the tables of this package for AutoMigrate (users first).
-func Models() []any { return []any{&platform.User{}, &Identity{}, &RetiredDevice{}} }
+func Models() []any {
+	return []any{&platform.User{}, &Identity{}, &RetiredDevice{}, &KakaoEventReceipt{}, &KakaoDeletionJob{}}
+}
 
 // RetiredDevice stores only a high-entropy device-token digest, without an account foreign key.
 // It must survive account deletion so an obsolete anonymous token cannot recreate that account.
@@ -50,7 +53,9 @@ type Service struct {
 	verifiers map[Provider]Verifier
 	now       func() time.Time
 	// BeforeDelete runs before an account is deleted, for data outside the database (backed-up photo objects).
-	BeforeDelete []func(userID string) error
+	BeforeDelete  []func(userID string) error
+	KakaoEvents   *KakaoEventVerifier
+	CleanupPhotos func(context.Context) error
 }
 
 func NewService(db *gorm.DB, secret string, verifiers map[Provider]Verifier, now func() time.Time) *Service {
@@ -112,7 +117,14 @@ func (s *Service) LoginWithDevice(ctx context.Context, p Provider, token, device
 	if !claimed && !isNew && strings.HasPrefix(deviceToken, "device-") && len(deviceToken) >= 16 {
 		return LoginResult{}, &platform.Error{Status: http.StatusConflict, Code: "ACCOUNT_LINK_CONFLICT", Message: "기존 기록을 보호하기 위해 다른 계정과 자동으로 합치지 않았어요"}
 	}
-	return LoginResult{Token: issue(s.secret, userID, s.now(), TokenTTL), UserID: userID, IsNew: isNew}, nil
+	var users []platform.User
+	if err := s.db.Where("id = ?", userID).Limit(1).Find(&users).Error; err != nil {
+		return LoginResult{}, err
+	}
+	if len(users) != 1 || users[0].AuthBlocked {
+		return LoginResult{}, &platform.Error{Status: http.StatusUnauthorized, Code: "ACCOUNT_DELETION_PENDING", Message: "계정 삭제를 처리하고 있어요"}
+	}
+	return LoginResult{Token: issue(s.secret, userID, s.now(), TokenTTL, users[0].AuthVersion), UserID: userID, IsNew: isNew}, nil
 }
 
 func (s *Service) claimDevice(provider, subject, token string) (string, bool, error) {
@@ -197,28 +209,55 @@ func (s *Service) userFor(provider, subject string) (string, bool, error) {
 
 // Resolve turns a login token into the user id, refusing forged, expired and deleted-account tokens.
 func (s *Service) Resolve(token string) (string, error) {
-	uid, err := parse(s.secret, token, s.now())
+	c, err := parseClaims(s.secret, token, s.now())
 	if err != nil {
 		return "", err
 	}
-	var n int64
-	if err := s.db.Model(&platform.User{}).Where("id = ?", uid).Count(&n).Error; err != nil {
+	var users []platform.User
+	if err := s.db.Where("id = ?", c.Sub).Limit(1).Find(&users).Error; err != nil {
 		return "", err
 	}
-	if n == 0 {
+	if len(users) != 1 || users[0].AuthBlocked || users[0].AuthVersion != c.Version {
 		return "", ErrInvalidToken
 	}
-	return uid, nil
+	return c.Sub, nil
 }
 
 // DeleteAccount removes the user; every table references users with ON DELETE CASCADE.
 func (s *Service) DeleteAccount(userID string) error {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&platform.User{}).Where("id = ?", userID).Updates(map[string]any{"auth_blocked": true, "auth_version": gorm.Expr("auth_version + 1")}).Error; err != nil {
+			return err
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&KakaoDeletionJob{UserID: userID, NextAttemptAt: s.now().UTC()}).Error
+	}); err != nil {
+		return err
+	}
+	if err := s.purgeAccount(userID); err != nil {
+		slog.Warn("account deletion retained for storage retry")
+		return nil // access is revoked and a durable cleanup request has been accepted
+	}
+	return s.db.Delete(&KakaoDeletionJob{}, "user_id = ?", userID).Error
+}
+
+func (s *Service) purgeAccount(userID string) error {
 	for _, f := range s.BeforeDelete {
 		if err := f(userID); err != nil {
 			return err
 		}
 	}
 	return s.db.Delete(&platform.User{}, "id = ?", userID).Error
+}
+
+func (s *Service) retireDeletedDevice(userID, token string) error {
+	if len(token) < 16 || strings.Contains(token, ".") {
+		return nil
+	}
+	sum := sha256.Sum256([]byte(token))
+	if userID != "dev-"+hex.EncodeToString(sum[:12]) {
+		return nil
+	}
+	return s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&RetiredDevice{Digest: hex.EncodeToString(sum[:]), CreatedAt: s.now().UTC()}).Error
 }
 
 // DevUserID is the user of the plain "dev" token in AUTH_DISABLED mode (curl, old dev builds).
@@ -253,6 +292,9 @@ func (s *Service) DevResolve(token string) (string, error) {
 	u := platform.User{ID: id, CreatedAt: s.now()}
 	if err := s.db.Where("id = ?", id).FirstOrCreate(&u).Error; err != nil {
 		return "", err
+	}
+	if u.AuthBlocked {
+		return "", ErrInvalidToken
 	}
 	return id, nil
 }
