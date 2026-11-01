@@ -136,7 +136,6 @@ export function WeeklyCard({
             <Text style={[styles.dayLabel, d.state === 'today' && styles.dayToday]}>
               {t(`weekdayShort.${String(d.index) as Wd}`)}
             </Text>
-            {d.state === 'today' ? <Text style={styles.inProgress}>{t('weekly.inProgress')}</Text> : null}
           </View>
         ))}
         <View style={{ width: TARGET_COL }} />
@@ -226,24 +225,11 @@ const makeStyles = (c: Palette) =>
       fontVariant: ['tabular-nums'],
     },
     baseline: { height: layout.hairline, backgroundColor: c.line, marginRight: TARGET_COL },
-    labels: { flexDirection: 'row', marginTop: 6, paddingBottom: 15 }, // 아래 15 = "진행 중" 한 줄 자리
-    labelCol: { flex: 1, alignItems: 'center', gap: 2 },
+    labels: { flexDirection: 'row', marginTop: 6 },
+    labelCol: { flex: 1, alignItems: 'center' },
     dayLabel: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: c.sub },
     dayToday: { fontFamily: fonts.semibold, color: c.text },
-    // 막대 칸(좁으면 32)보다 넓어도 양옆으로 넘쳐 한 줄로 보이게 칸 밖으로 띄운다
-    inProgress: {
-      position: 'absolute',
-      top: 19,
-      left: '50%',
-      width: 64,
-      marginLeft: -32,
-      textAlign: 'center',
-      fontFamily: fonts.medium,
-      fontSize: 11,
-      lineHeight: 14,
-      color: c.text,
-    },
-    tabs: { flexDirection: 'row', marginTop: 8 }, // 요일·"진행 중" 아래 → 탭 8 (시안)
+    tabs: { flexDirection: 'row', marginTop: 8 }, // 요일 아래 → 탭 8 (시안)
     tab: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
     tabSep: { position: 'absolute', left: 0, top: 14, height: 16, width: layout.hairline, backgroundColor: c.line },
     tabText: { fontFamily: fonts.regular, fontSize: 14, color: c.sub },

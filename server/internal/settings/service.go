@@ -194,11 +194,18 @@ func (s *Service) save(userID string, st Settings, pending *Mode, from *platform
 		GymLat: st.Gym.Lat, GymLng: st.Gym.Lng, GymRadiusM: st.Gym.RadiusM,
 		SleepEnabled: st.Sleep.Enabled, BedTime: st.Sleep.BedTime, WakeTime: st.Sleep.WakeTime,
 		GymWeeklyTarget: st.Gym.WeeklyTarget, Nickname: st.Nickname, ThemeMode: st.ThemeMode,
+		Accent: DefaultAccent, Gradient: DefaultGradient,
 		Notifications: st.Notifications == nil || *st.Notifications, ShareFriends: st.ShareFriends,
 		UpdatedAt: s.clock.Now(),
 	}
 	if row.ThemeMode == "" {
 		row.ThemeMode = "system"
+	}
+	if st.Accent.Val != nil {
+		row.Accent = *st.Accent.Val
+	}
+	if st.Gradient.Val != nil {
+		row.Gradient = *st.Gradient.Val
 	}
 	if st.Sex.Val != nil {
 		row.Sex = ptr(string(*st.Sex.Val))
@@ -315,7 +322,7 @@ func (s *Service) load(userID string) (Settings, Row, error) {
 		Targets:     &Targets{Kcal: row.TargetKcal, Carbs: row.TargetCarbs, Protein: row.TargetProtein, Fat: row.TargetFat},
 		AllowedApps: make([]string, 0, len(apps)),
 		LockMinutes: row.LockMinutes, EmergencyPerWeek: row.EmergencyPerWeek, PhotoBackup: row.PhotoBackup,
-		Nickname: row.Nickname, ThemeMode: row.ThemeMode, Notifications: ptr(row.Notifications),
+		Nickname: row.Nickname, ThemeMode: row.ThemeMode, Accent: Some(row.Accent), Gradient: Some(row.Gradient), Notifications: ptr(row.Notifications),
 		ShareFriends: row.ShareFriends,
 	}
 	st.Gym.WeeklyTarget = row.GymWeeklyTarget

@@ -77,6 +77,8 @@ export function toSettingsBody(s: Settings): Settings {
     photoBackup: s.photoBackup,
     nickname: s.nickname,
     themeMode: s.themeMode,
+    accent: s.accent,
+    gradient: s.gradient,
     notifications: s.notifications,
     shareFriends: s.shareFriends,
     foodStyle: { ...s.foodStyle },

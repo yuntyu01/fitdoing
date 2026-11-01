@@ -88,6 +88,7 @@ export const SCREENS = [
   { route: '/onboarding/routine', name: 'onboarding-6-routine', mode: 'fresh' },
   { route: '/onboarding/permissions', name: 'onboarding-7-permissions', mode: 'fresh' },
   { route: '/edit/profile', name: 'edit-profile' },
+  { route: '/edit/theme', name: 'edit-theme' },
   { route: '/edit/meals', name: 'edit-meals' },
   { route: '/edit/gym', name: 'edit-gym' },
   { route: '/edit/gym', name: 'gym-place-sheet', actions: (page) => openByText(page, '바디핏짐 성수점') },

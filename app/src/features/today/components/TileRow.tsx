@@ -126,7 +126,7 @@ const makeStyles = (c: Palette) =>
     pressed: { opacity: 0.7 },
     check: { position: 'absolute', top: 6, right: 6 },
     title: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: TITLE_LH, color: c.text, textAlign: 'center' },
-    textOn: { fontFamily: fonts.bold, color: c.bg },
+    textOn: { fontFamily: fonts.bold, color: c.onBar },
     sub: {
       fontFamily: fonts.regular,
       fontSize: 13,

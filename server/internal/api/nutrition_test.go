@@ -15,7 +15,7 @@ import (
 // oldAppBody is the contract body without the 2026-10 fields, as an older app sends it.
 func oldAppBody(t *testing.T) map[string]any {
 	s := parse(t, contract(t, "settings.json"))
-	for _, k := range []string{"sex", "age", "activity", "activityInput", "nutrition", "targetHistory", "foodStyle", "allergies", "fasting"} {
+	for _, k := range []string{"accent", "gradient", "sex", "age", "activity", "activityInput", "nutrition", "targetHistory", "foodStyle", "allergies", "fasting"} {
 		delete(s, k)
 	}
 	return s
@@ -40,6 +40,8 @@ func TestOlderAppSaveKeepsNewFields(t *testing.T) {
 			old["nickname"] = "구버전"
 			r := e.put(path, js(old)).is(t, 200)
 			r.eq(t, "settings.nickname", "구버전")
+			r.eq(t, "settings.accent", "#85ADE2")
+			r.eq(t, "settings.gradient", 0.7)
 			r.eq(t, "settings.sex", "male")
 			r.eq(t, "settings.age", float64(30))
 			r.eq(t, "settings.activity", "low")
@@ -69,6 +71,8 @@ func TestNewFieldValidation(t *testing.T) {
 	for name, mut := range map[string]func(map[string]any){
 		"activity case": func(s map[string]any) { s["activity"] = "VERYACTIVE" },
 		"sex":           func(s map[string]any) { s["sex"] = "other" },
+		"accent":        func(s map[string]any) { s["accent"] = "blue" },
+		"gradient":      func(s map[string]any) { s["gradient"] = 1.5 },
 		"age":           func(s map[string]any) { s["age"] = 7 },
 		"nutrition":     func(s map[string]any) { s["nutrition"] = map[string]any{"plan": map[string]any{"mode": "keto"}} },
 		"food style":    func(s map[string]any) { s["foodStyle"] = map[string]any{"pattern": "paleo"} },

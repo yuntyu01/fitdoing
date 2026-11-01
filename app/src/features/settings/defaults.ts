@@ -2,6 +2,7 @@ import type { Settings } from '../../db/schema';
 import { resizeMeals } from '../../domain/meals';
 import { defaultFoodStyle } from '../../domain/nutrition';
 import { PLACEHOLDER_TARGETS } from '../../domain/targets';
+import { DEFAULT_ACCENT, DEFAULT_GRADIENT } from '../../ui/color';
 
 /** 온보딩 첫 화면의 초기값. 시안과 같은 값으로 시작한다. */
 export function initialSettings(): Settings {
@@ -38,6 +39,8 @@ export function initialSettings(): Settings {
     photoBackup: false,
     nickname: '',
     themeMode: 'system',
+    accent: DEFAULT_ACCENT,
+    gradient: DEFAULT_GRADIENT,
     notifications: true,
     shareFriends: false,
     foodStyle: defaultFoodStyle(),

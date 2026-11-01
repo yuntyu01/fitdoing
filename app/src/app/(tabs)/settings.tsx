@@ -71,6 +71,7 @@ function ProfileRow({ nickname, onPress }: { nickname: string; onPress: () => vo
 }
 
 export default function SettingsScreen() {
+  const c = usePalette();
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const tabSpace = useTabBarSpace(); // 떠 있는 탭바에 마지막 내용이 가리지 않게
@@ -89,12 +90,14 @@ export default function SettingsScreen() {
         : t('sync.never');
   const go = (href: Href) => () => router.push(href);
   const openSupport = () => {
-    void Linking.openURL('https://midi-broccoli-56c.notion.site/FitDoing-3f4502846708812981c9db286d1eef63')
-      .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
+    void Linking.openURL('https://midi-broccoli-56c.notion.site/FitDoing-3f4502846708812981c9db286d1eef63').catch(() =>
+      Alert.alert('FitDoing', 'yuntyu01@gmail.com'),
+    );
   };
   const openPrivacy = () => {
-    void Linking.openURL('https://midi-broccoli-56c.notion.site/3f450284670881b880e6fd67ba899903')
-      .catch(() => Alert.alert('FitDoing', 'yuntyu01@gmail.com'));
+    void Linking.openURL('https://midi-broccoli-56c.notion.site/3f450284670881b880e6fd67ba899903').catch(() =>
+      Alert.alert('FitDoing', 'yuntyu01@gmail.com'),
+    );
   };
 
   const confirmLogout = () =>
@@ -170,18 +173,30 @@ export default function SettingsScreen() {
 
         <Section title={t('settings.sectionLock')}>
           <ListRow label={t('lockSetup.title')} onPress={go('/edit/lock' as Href)} />
-          <ListRow onPress={go('/edit/lock' as Href)} label={t('settings.lockMinutes')} value={t('common.hours', { h: s.lockMinutes / 60 })} />
+          <ListRow
+            onPress={go('/edit/lock' as Href)}
+            label={t('settings.lockMinutes')}
+            value={t('common.hours', { h: s.lockMinutes / 60 })}
+          />
           <ListRow
             onPress={go('/edit/lock' as Href)}
             label={t('settings.emergency')}
             value={t('settings.emergencyValue', { n: s.emergencyPerWeek })}
           />
-          <ListRow onPress={go('/edit/lock' as Href)} label={t('settings.allowedApps')} value={t('settings.allowedAppsValue')} />
+          <ListRow
+            onPress={go('/edit/lock' as Href)}
+            label={t('settings.allowedApps')}
+            value={t('settings.allowedAppsValue')}
+          />
         </Section>
 
         <Section
           title={t('settings.sectionApp')}
-          note={SERVER_CONFIGURED ? `${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}` : t('settings.localPhotoNote')}
+          note={
+            SERVER_CONFIGURED
+              ? `${t('settings.photoAnalysisNote')}\n${t('settings.photoBackupDesc')}`
+              : t('settings.localPhotoNote')
+          }
         >
           <ListRow
             label={t('settings.coupons')}
@@ -194,6 +209,16 @@ export default function SettingsScreen() {
             label={t('settings.shareFriends')}
             desc={t('settings.shareFriendsDesc')}
             right={<Toggle value={s.shareFriends} onChange={(shareFriends) => update({ shareFriends })} />}
+          />
+          <ListRow
+            label={t('settings.customize')}
+            onPress={go('/edit/theme' as Href)}
+            right={
+              <View style={styles.accentRight}>
+                <View style={[styles.accentDot, { backgroundColor: s.accent }]} />
+                <ChevronRight size={18} color={c.sub} strokeWidth={1.8} />
+              </View>
+            }
           />
           <ListRow
             label={t('settings.themeMode')}
@@ -209,7 +234,11 @@ export default function SettingsScreen() {
             label={t('settings.photoBackup')}
             right={<Toggle value={s.photoBackup} onChange={(photoBackup) => update({ photoBackup })} />}
           />
-          <ListRow disabled label={t('sync.title')} value={SERVER_CONFIGURED ? syncValue : t('settings.serverUnavailable')} />
+          <ListRow
+            disabled
+            label={t('sync.title')}
+            value={SERVER_CONFIGURED ? syncValue : t('settings.serverUnavailable')}
+          />
         </Section>
 
         <Section title={t('settings.support')} note={SERVER_CONFIGURED ? undefined : t('settings.localBuildNote')}>
@@ -246,6 +275,8 @@ const makeStyles = (c: Palette) =>
     screen: { flex: 1, backgroundColor: c.bg },
     body: { paddingHorizontal: layout.page, gap: layout.block },
     title: { ...text.title, color: c.text, marginTop: 20 },
+    accentRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    accentDot: { width: 18, height: 18, borderRadius: 9, borderWidth: layout.hairline, borderColor: c.border },
     note: { ...text.caption, color: c.sub, marginTop: 4 },
     pressed: { opacity: 0.6 },
     profile: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20, paddingVertical: 8 },

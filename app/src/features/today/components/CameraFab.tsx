@@ -3,12 +3,12 @@ import { Camera } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
-import { glass, layout, size } from '../../../ui/tokens';
+import { layout, size } from '../../../ui/tokens';
 
 const RING_GAP = 4; // 마감 임박 링과 버튼 사이
 
 /**
- * 오른쪽 아래에 내용 위로 떠 있는 카메라 버튼 (56, 진행 막대 색으로 채우고 아이콘은 배경색). 그림자 없음.
+ * 오른쪽 아래에 내용 위로 떠 있는 카메라 버튼 (56, 진행 막대 색으로 채우고 아이콘은 그 위 글자색). 그림자 없음.
  * 마감 10분 이하면 바깥에 얇은 링을 둘러 강조한다(버튼 위치는 그대로). 누르면 촬영 화면으로 간다.
  */
 export function CameraFab({ urgent, bottom = 0, onPress }: { urgent: boolean; bottom?: number; onPress?: () => void }) {
@@ -25,7 +25,7 @@ export function CameraFab({ urgent, bottom = 0, onPress }: { urgent: boolean; bo
         onPress={onPress ?? (() => router.push('/capture'))}
         style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
       >
-        <Camera size={24} color={c.bg} strokeWidth={2} />
+        <Camera size={24} color={c.onBar} strokeWidth={2} />
       </Pressable>
     </View>
   );
@@ -38,7 +38,7 @@ const makeStyles = (c: Palette) =>
   StyleSheet.create({
     ring: {
       position: 'absolute',
-      right: glass.navSide - RING_GAP,
+      right: layout.screen - RING_GAP,
       padding: RING_GAP - layout.hairline,
       borderRadius: size.fab / 2 + RING_GAP,
       borderWidth: layout.hairline,

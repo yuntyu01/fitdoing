@@ -19,6 +19,8 @@ interface SettingsState {
 
 const ROW_ID = 1;
 
+const applyLook = (s: Settings) => useThemeMode.setState({ mode: s.themeMode, accent: s.accent, gradient: s.gradient });
+
 export const useSettings = create<SettingsState>((set, get) => ({
   settings: null,
   loaded: false,
@@ -27,13 +29,13 @@ export const useSettings = create<SettingsState>((set, get) => ({
     const row = db.select().from(settingsTable).get();
     // 예전 버전이 저장한 설정에는 새 필드(화면 모드·알림·닉네임·주간 목표…)가 없어서 기본값으로 채운다
     const settings = row?.json ? fromSettingsBody(row.json, initialSettings()) : null;
-    if (settings) useThemeMode.setState({ mode: settings.themeMode });
+    if (settings) applyLook(settings);
     set({ settings, loaded: true });
   },
 
   save: (next) => {
     const prevBackup = get().settings?.photoBackup ?? false;
-    useThemeMode.setState({ mode: next.themeMode });
+    applyLook(next);
     const now = Date.now();
     db.insert(settingsTable)
       .values({ id: ROW_ID, json: next, updatedAt: now })

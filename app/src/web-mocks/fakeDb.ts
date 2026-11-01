@@ -40,6 +40,8 @@ export const seedSettings: Settings = {
   photoBackup: false,
   nickname: '지훈',
   themeMode: 'system',
+  accent: '#FFFFFF',
+  gradient: 0.7,
   notifications: true,
   shareFriends: false,
   foodStyle: { pattern: 'general', eggs: true, dairy: true },

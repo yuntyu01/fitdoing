@@ -124,6 +124,10 @@ type Settings struct {
 	Notifications *bool  `json:"notifications"` // deadline reminders on/off (absent = on)
 	ShareFriends  bool   `json:"shareFriends"`  // new meals are shared with friends by default
 
+	// Added 2026-11 (theme color). Opt: an older app leaves them out and the stored value is kept.
+	Accent   Opt[string]  `json:"accent"`   // #RRGGBB
+	Gradient Opt[float64] `json:"gradient"` // top gradient strength 0..1
+
 	// Added 2026-10 (nutrition targets). Opt: an older app leaves them out and the stored value is kept;
 	// null means "unknown" (never filled with a guessed default).
 	Sex           Opt[Sex]             `json:"sex"`
@@ -143,6 +147,8 @@ func (s *Settings) Merge(stored Settings) {
 	if s.fromOlderApp() {
 		s.protectFromOlderApp(stored)
 	}
+	s.Accent = s.Accent.or(stored.Accent)
+	s.Gradient = s.Gradient.or(stored.Gradient)
 	s.Sex = s.Sex.or(stored.Sex)
 	s.Age = s.Age.or(stored.Age)
 	s.Activity = s.Activity.or(stored.Activity)
@@ -155,6 +161,14 @@ func (s *Settings) Merge(stored Settings) {
 
 // ThemeModes are the allowed themeMode values.
 var ThemeModes = []string{"system", "light", "dark"}
+
+// Defaults of the theme color columns.
+const (
+	DefaultAccent   = "#FFFFFF"
+	DefaultGradient = 0.7
+)
+
+var accentPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 // Normalize fills the defaults of the fields older apps don't send.
 func (s *Settings) Normalize() {
@@ -227,6 +241,10 @@ func (s *Settings) Validate() error {
 		return platform.Invalid("nickname", "20자 이하여야 해요")
 	case s.ThemeMode != "" && !slices.Contains(ThemeModes, s.ThemeMode):
 		return platform.Invalid("themeMode", "system, light, dark 중 하나예요")
+	case s.Accent.Val != nil && !accentPattern.MatchString(*s.Accent.Val):
+		return platform.Invalid("accent", "#RRGGBB 형식이어야 해요")
+	case s.Gradient.Val != nil && (*s.Gradient.Val < 0 || *s.Gradient.Val > 1):
+		return platform.Invalid("gradient", "0~1 사이여야 해요")
 	}
 	for _, c := range []struct {
 		field string
@@ -338,6 +356,8 @@ type Row struct {
 	GymWeeklyTarget  int            `gorm:"column:gym_weekly_target;not null;default:0"`
 	Nickname         string         `gorm:"column:nickname;size:80;not null;default:''"`
 	ThemeMode        string         `gorm:"column:theme_mode;size:8;not null;default:'system'"`
+	Accent           string         `gorm:"column:accent;size:7;not null;default:'#FFFFFF'"`
+	Gradient         float64        `gorm:"column:gradient;not null;default:0.7"`
 	Notifications    bool           `gorm:"column:notifications;not null;default:true"`
 	ShareFriends     bool           `gorm:"column:share_friends;not null;default:false"`
 	// Added 2026-10: nullable, unknown until the user enters them (rows of older apps stay NULL).

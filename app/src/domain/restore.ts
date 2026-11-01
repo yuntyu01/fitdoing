@@ -149,6 +149,8 @@ export function fromSettingsBody(raw: unknown, defaults: Settings): Settings {
     photoBackup: bool(b.photoBackup, defaults.photoBackup),
     nickname: str(b.nickname, defaults.nickname),
     themeMode: oneOf(b.themeMode, THEME_MODES) ?? defaults.themeMode,
+    accent: typeof b.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(b.accent) ? b.accent : defaults.accent,
+    gradient: Math.max(0, Math.min(1, num(b.gradient, defaults.gradient))),
     notifications: bool(b.notifications, defaults.notifications),
     shareFriends: bool(b.shareFriends, defaults.shareFriends),
   };

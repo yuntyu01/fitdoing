@@ -21,21 +21,25 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: t('tabs.today'),
-          tabBarIcon: ({ color, size }) => <House color={color} size={size} strokeWidth={1.8} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <House color={color} size={size} strokeWidth={1.8} fill={focused ? color : 'none'} />
+          ),
         }}
       />
       <Tabs.Screen
         name="records"
         options={{
           title: t('tabs.records'),
-          tabBarIcon: ({ color, size }) => <ChartNoAxesColumn color={color} size={size} strokeWidth={1.8} />,
+          tabBarIcon: ({ color, size }) => <ChartNoAxesColumn color={color} size={size} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="friends"
         options={{
           title: t('tabs.friends'),
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} strokeWidth={1.8} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Users color={color} size={size} strokeWidth={1.8} fill={focused ? color : 'none'} />
+          ),
         }}
       />
       <Tabs.Screen
