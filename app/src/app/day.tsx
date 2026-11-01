@@ -4,7 +4,7 @@ import { StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { dateKey, parseDateKey } from '../domain/time';
-import { GymSection, LockSection, MealSection } from '../features/records/DaySections';
+import { GymSection, MealSection } from '../features/records/DaySections';
 import { kcalText, macroText } from '../features/records/format';
 import { useDayRecords } from '../features/records/useDayRecords';
 import { CenterHeader } from '../ui/Headers';
@@ -23,8 +23,7 @@ export default function DayScreen() {
   const date = params.date && DATE_RE.test(params.date) ? params.date : dateKey(new Date());
   const d = parseDateKey(date);
   const rec = useDayRecords(date);
-  const locked = rec.locks.length > 0 || rec.lockedMeals.length > 0;
-  const empty = rec.meals.length === 0 && !rec.gym && !locked;
+  const empty = rec.meals.length === 0 && !rec.gym;
 
   // 링크로 바로 열렸으면 돌아갈 곳이 없으니 기록 탭으로
   const back = () => (router.canGoBack() ? router.back() : router.replace('/records'));
@@ -55,7 +54,6 @@ export default function DayScreen() {
         />
       ))}
       {rec.gym ? <GymSection gym={rec.gym} /> : null}
-      {locked ? <LockSection locks={rec.locks} lockedMeals={rec.lockedMeals} /> : null}
     </Screen>
   );
 }

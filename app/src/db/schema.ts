@@ -51,6 +51,7 @@ export interface Settings {
   lockMinutes: number;
   emergencyPerWeek: number;
   photoBackup: boolean; // 켰을 때만 사진이 R2로 올라간다
+  photoKeepDays: number | null; // 폰에 끼니 사진을 며칠 둘지 (null = 계속). 이 폰에만 적용해서 서버로 보내지 않는다
   nickname: string; // 친구에게 보이는 이름 (20자 이하)
   themeMode: ThemeMode; // 화면 모드: 시스템 설정을 따르거나 밝게/어둡게 고정
   accent: string; // 테마색 #RRGGBB (유리 디자인 화면에 적용)

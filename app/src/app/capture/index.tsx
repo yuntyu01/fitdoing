@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cleanBarcode, pickMealIndex } from '../../domain/logging';
 import { useCaptureDraft } from '../../features/meals/captureDraft';
-import { releaseGymLock } from '../../features/lock/actions';
+import { markGymDone } from '../../features/gym/checkIn';
 import { useSettingsValue } from '../../features/settings/store';
 import { useNow, useToday } from '../../features/today/useToday';
 import { FullButton } from '../../ui/FullButton';
@@ -84,7 +84,7 @@ export default function CaptureScreen() {
       const pic = await camera.current.takePictureAsync({ quality: 0.9, skipProcessing: false, shutterSound: false });
       if (gym) {
         // 헬스 사진 인증: 끼니 기록이 아니므로 리뷰 없이 도착 인증만 남기고 잠금을 푼다.
-        releaseGymLock('photo');
+        markGymDone('photo');
         router.back();
         return;
       }

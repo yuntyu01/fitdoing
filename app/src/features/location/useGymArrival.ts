@@ -15,8 +15,8 @@ interface Gym {
 }
 
 /**
- * 잠금 화면이 떠 있는 동안 헬스장까지 거리를 계속 본다. 반경 안에 들어오면 onArrive를 한 번 부른다.
- * (features/location/useGymDistance.ts는 한 번만 재는 훅이라, 도착 감지용으로 watch를 따로 쓴다.)
+ * 헬스 상세 화면이 떠 있는 동안 헬스장까지 거리를 계속 본다. 반경 안에 들어오면 onArrive를 한 번 부른다.
+ * (useGymDistance.ts는 한 번만 재는 훅이라, 도착 감지용으로 watch를 따로 쓴다.)
  * 개인정보: 위치는 폰 안에서 거리 계산에만 쓰고 어디에도 저장·전송하지 않는다.
  */
 export function useGymArrival(gym: Gym, onArrive: () => void): ArrivalState {

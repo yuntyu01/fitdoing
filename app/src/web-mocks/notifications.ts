@@ -10,3 +10,6 @@ export const AndroidImportance = { HIGH: 4 };
 export const SchedulableTriggerInputTypes = { DATE: 'date' };
 export const addNotificationResponseReceivedListener = () => ({ remove: () => {} });
 export const dismissAllNotificationsAsync = async () => {};
+export const useLastNotificationResponse = () => null;
+export const clearLastNotificationResponse = () => {};
+export const DEFAULT_ACTION_IDENTIFIER = 'expo.modules.notifications.actions.DEFAULT';

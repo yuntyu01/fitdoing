@@ -37,6 +37,7 @@ export function initialSettings(): Settings {
     lockMinutes: 120,
     emergencyPerWeek: 2,
     photoBackup: false,
+    photoKeepDays: null,
     nickname: '',
     themeMode: 'system',
     accent: DEFAULT_ACCENT,

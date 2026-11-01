@@ -2,11 +2,6 @@
   "name": "fitdoing",
   "version": "0.1.0",
   "main": "expo-router/entry",
-  "expo": {
-    "autolinking": {
-      "nativeModulesDir": "../modules"
-    }
-  },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "@react-native-google-signin/google-signin": "^16.1.5",

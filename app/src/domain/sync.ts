@@ -42,7 +42,7 @@ export interface SyncEventsBody {
 }
 
 /** PUT /api/sync/settings 본문. Settings에 있는 필드만, 계약과 같은 순서로. */
-export function toSettingsBody(s: Settings): Settings {
+export function toSettingsBody(s: Settings): Omit<Settings, 'photoKeepDays'> {
   return {
     mode: s.mode,
     goal: s.goal,

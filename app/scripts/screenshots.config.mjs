@@ -81,7 +81,6 @@ export const SCREENS = [
   { route: '/records', name: 'records' },
   { route: '/records', name: 'records-month-picker', actions: (page) => openByText(page, '2026년 9월') },
   { route: '/settings', name: 'settings', fullPage: true },
-  { route: '/settings', name: 'coupon-sheet', actions: (page) => openByText(page, '쿠폰') },
   { route: '/login', name: 'login', mode: 'loggedOut' },
   { route: '/onboarding', name: 'onboarding-1-goal', mode: 'fresh' },
   { route: '/onboarding/meals', name: 'onboarding-5-meals', mode: 'fresh' },
@@ -93,7 +92,6 @@ export const SCREENS = [
   { route: '/edit/gym', name: 'edit-gym' },
   { route: '/edit/gym', name: 'gym-place-sheet', actions: (page) => openByText(page, '바디핏짐 성수점') },
   { route: '/edit/sleep', name: 'edit-sleep' },
-  { route: '/edit/mode', name: 'edit-mode' },
   // 영양 목표 4단계 (신체·목표 → 활동 → 계산 모드 → 결과). 2~4단계는 1단계에서 이어 들어가야 열린다.
   { route: '/edit/nutrition', name: 'nutrition-1-body' },
   { route: '/edit/nutrition', name: 'nutrition-2-activity', actions: (p) => nutritionTo(p, 2) },
@@ -129,7 +127,6 @@ export const SCREENS = [
     actions: (page) => openByText(page, '100%'),
   },
   { route: '/settings', name: 'theme-sheet', actions: (page) => openByText(page, '화면 모드') },
-  { route: '/emergency', name: 'emergency' }, // 걸린 잠금이 없을 때
   // 기록 탭에서 기록이 없는 날(9/2)을 고른 상태
   { route: '/records', name: 'records-empty-day', actions: (page) => openByText(page, '2') },
   // 쿼리로 여는 화면 (파일 경로만 확인하고 쿼리는 그대로 연다)
@@ -137,7 +134,4 @@ export const SCREENS = [
   { route: '/friend?id=sample-minsu', name: 'friend' }, // 친구 기능은 개발용 예시 데이터 (features/friends/sample.ts)
   { route: '/friends', name: 'friends' },
   // 잠금 화면 (시드 설정 저장 시각 9/26 18:40 이후여야 걸린다): 토 19:05는 헬스 요일이라 헬스 잠금, 화 19:05는 헬스 없는 날의 끼니 잠금 (헬스 요일: 월·수·금·토·일)
-  { route: '/lock/meal', name: 'lock-meal', time: '2026-09-29T19:05:00+09:00' },
-  { route: '/lock/gym', name: 'lock-gym', time: '2026-09-26T19:05:00+09:00' },
-  { route: '/lock/sleep', name: 'lock-sleep', time: '2026-09-26T23:45:00+09:00' },
 ];

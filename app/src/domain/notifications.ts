@@ -2,18 +2,20 @@ import { deadlinesFor, scheduleDay, type MealSlot } from './meals';
 import { addDays, atMinutes, dateKey, fromMinutes, toMinutes, weekdayMon0 } from './time';
 
 export const PRE_DEADLINE_MIN = 30;
-// 헬스는 도착 시간만 받는다. 알림(나중엔 SNS 잠금)은 도착 1시간 전에 시작한다.
+// 헬스는 도착 시간만 받는다. 알림은 도착 1시간 전에 시작한다.
 export const GYM_LEAD_MIN = 60;
 export const HORIZON_DAYS = 7;
 
 export type PlannedNotification =
   | { id: string; at: Date; kind: 'meal_pre'; meal: number; deadline: string }
   | { id: string; at: Date; kind: 'meal_due'; meal: number; deadline: string }
-  | { id: string; at: Date; kind: 'gym_start'; arriveBy: string };
+  | { id: string; at: Date; kind: 'gym_start'; arriveBy: string }
+  | { id: string; at: Date; kind: 'sleep_start'; bedTime: string };
 
 export interface NotificationInput {
   meals: MealSlot[];
   gym: { enabled: boolean; days: number[]; arriveBy: string };
+  sleep: { enabled: boolean; bedTime: string };
 }
 
 export const mealKey = (date: string, index: number) => `${date}#${index}`;
@@ -46,7 +48,19 @@ export function planNotifications(
       const at = atMinutes(day, toMinutes(input.gym.arriveBy) - GYM_LEAD_MIN);
       out.push({ id: `gym-${dateKey(day)}`, at, kind: 'gym_start', arriveBy: input.gym.arriveBy });
     }
+
+    if (input.sleep.enabled) {
+      const at = atMinutes(day, toMinutes(input.sleep.bedTime));
+      out.push({ id: `sleep-${dateKey(day)}`, at, kind: 'sleep_start', bedTime: input.sleep.bedTime });
+    }
   }
 
   return out.filter((n) => n.at.getTime() > now.getTime()).sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+/** 알림을 눌렀을 때 갈 화면. 끼니는 촬영, 헬스는 헬스 상세, 그 밖에는 앱만 연다. */
+export function notificationRoute(kind: unknown): '/capture' | '/gym' | null {
+  if (kind === 'meal_pre' || kind === 'meal_due') return '/capture';
+  if (kind === 'gym_start') return '/gym';
+  return null;
 }

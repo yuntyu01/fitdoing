@@ -2,7 +2,7 @@ import { router, type Href } from 'expo-router';
 import { ChevronRight, UserRound } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatNumber } from '../../domain/format';
@@ -10,9 +10,9 @@ import { SERVER_CONFIGURED } from '../../features/api/client';
 import { useSyncStatus } from '../../features/api/store';
 import { deleteAccountAndData, logout } from '../../features/auth/account';
 import { AUTH_DISABLED } from '../../features/auth/session';
-import { CouponSheet } from '../../features/coupons/CouponSheet';
-import { useCouponStatus } from '../../features/coupons/useCoupons';
+import { purgeOldPhotos } from '../../features/meals/purge';
 import { askToEnableNotifications } from '../../features/settings/notifications';
+import { PhotoKeepSheet } from '../../features/settings/PhotoKeepSheet';
 import { useSettings, useSettingsValue } from '../../features/settings/store';
 import { ThemeSheet } from '../../features/settings/ThemeSheet';
 import { SectionLabel } from '../../ui/Card';
@@ -21,6 +21,9 @@ import { ListRow } from '../../ui/ListRow';
 import { usePalette, useThemedStyles, type Palette } from '../../ui/theme';
 import { Toggle } from '../../ui/Toggle';
 import { fonts, layout, text } from '../../ui/tokens';
+
+// Android 12 부터 정확한 시각의 알림은 사용자가 허용해야 한다. 허용하지 않으면 알림이 늦게 올 수 있다.
+const EXACT_ALARM_SETTING = Platform.OS === 'android' && Number(Platform.Version) >= 31;
 
 const formatDateTime = (ms: number) => {
   const d = new Date(ms);
@@ -77,8 +80,7 @@ export default function SettingsScreen() {
   const tabSpace = useTabBarSpace(); // 떠 있는 탭바에 마지막 내용이 가리지 않게
   const s = useSettingsValue();
   const update = useSettings((st) => st.update);
-  const coupons = useCouponStatus();
-  const [couponOpen, setCouponOpen] = useState(false);
+  const [photoKeepOpen, setPhotoKeepOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const syncPending = useSyncStatus((st) => st.pending);
   const lastSyncAt = useSyncStatus((st) => st.lastSyncAt);
@@ -120,10 +122,26 @@ export default function SettingsScreen() {
       },
     ]);
 
-  const modeLabel = { mild: t('settings.modeMild'), normal: t('settings.modeNormal'), spicy: t('settings.modeSpicy') }[
-    s.mode
-  ];
-  const couponsLeft = coupons.rest.left + coupons.cheat.left;
+  // 지운 사진은 되돌릴 수 없으니 기간을 정할 때 한 번 더 묻는다.
+  const savePhotoKeep = (photoKeepDays: number | null) => {
+    setPhotoKeepOpen(false);
+    if (photoKeepDays === s.photoKeepDays) return;
+    if (photoKeepDays === null) {
+      update({ photoKeepDays });
+      return;
+    }
+    Alert.alert(t('settings.photoKeepConfirmTitle', { n: photoKeepDays }), t('settings.photoKeepConfirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('settings.photoKeepConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          update({ photoKeepDays });
+          purgeOldPhotos({ ...s, photoKeepDays });
+        },
+      },
+    ]);
+  };
 
   // 켤 때 알림 권한이 없으면 묻는다. 허용하지 않으면 꺼진 채로 둔다.
   const toggleNotifications = async (on: boolean) => {
@@ -158,7 +176,6 @@ export default function SettingsScreen() {
             value={s.sleep.enabled ? `${s.sleep.bedTime} · ${s.sleep.wakeTime}` : t('common.off')}
             onPress={go('/edit/sleep')}
           />
-          <ListRow label={t('settings.mode')} value={modeLabel} onPress={go('/edit/mode')} />
           <ListRow
             label={t('settings.targets')}
             value={`${formatNumber(s.targets.kcal)} ${t('common.kcal')}`}
@@ -171,25 +188,6 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        <Section title={t('settings.sectionLock')}>
-          <ListRow label={t('lockSetup.title')} onPress={go('/edit/lock' as Href)} />
-          <ListRow
-            onPress={go('/edit/lock' as Href)}
-            label={t('settings.lockMinutes')}
-            value={t('common.hours', { h: s.lockMinutes / 60 })}
-          />
-          <ListRow
-            onPress={go('/edit/lock' as Href)}
-            label={t('settings.emergency')}
-            value={t('settings.emergencyValue', { n: s.emergencyPerWeek })}
-          />
-          <ListRow
-            onPress={go('/edit/lock' as Href)}
-            label={t('settings.allowedApps')}
-            value={t('settings.allowedAppsValue')}
-          />
-        </Section>
-
         <Section
           title={t('settings.sectionApp')}
           note={
@@ -198,11 +196,6 @@ export default function SettingsScreen() {
               : t('settings.localPhotoNote')
           }
         >
-          <ListRow
-            label={t('settings.coupons')}
-            value={t('settings.couponsLeft', { n: couponsLeft })}
-            onPress={() => setCouponOpen(true)}
-          />
           <ListRow label={t('settings.friendsManage')} onPress={go('/friends-manage' as Href)} />
           <ListRow label={t('share.title')} onPress={go('/share-page' as Href)} />
           <ListRow
@@ -230,9 +223,27 @@ export default function SettingsScreen() {
             desc={t('settings.notificationsDesc')}
             right={<Toggle value={s.notifications} onChange={(on) => void toggleNotifications(on)} />}
           />
+          {s.notifications && EXACT_ALARM_SETTING ? (
+            <ListRow
+              label={t('settings.exactAlarm')}
+              desc={t('settings.exactAlarmDesc')}
+              onPress={() => {
+                Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => Linking.openSettings());
+              }}
+            />
+          ) : null}
           <ListRow
             label={t('settings.photoBackup')}
             right={<Toggle value={s.photoBackup} onChange={(photoBackup) => update({ photoBackup })} />}
+          />
+          <ListRow
+            label={t('settings.photoKeep')}
+            value={
+              s.photoKeepDays === null
+                ? t('settings.photoKeepForever')
+                : t('settings.photoKeepDays', { n: s.photoKeepDays })
+            }
+            onPress={() => setPhotoKeepOpen(true)}
           />
           <ListRow
             disabled
@@ -254,7 +265,12 @@ export default function SettingsScreen() {
           </Section>
         )}
       </ScrollView>
-      <CouponSheet visible={couponOpen} onClose={() => setCouponOpen(false)} />
+      <PhotoKeepSheet
+        visible={photoKeepOpen}
+        value={s.photoKeepDays}
+        onClose={() => setPhotoKeepOpen(false)}
+        onSave={savePhotoKeep}
+      />
       <ThemeSheet
         visible={themeOpen}
         value={s.themeMode}

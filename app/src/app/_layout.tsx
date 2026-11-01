@@ -13,8 +13,9 @@ import migrations from '../db/migrations/migrations';
 import { flushQueue } from '../features/api/client';
 import { startSync } from '../features/api/track';
 import { loadSession, useSession } from '../features/auth/session';
-import { useLockController } from '../features/lock/controller';
+import { purgeOldPhotos } from '../features/meals/purge';
 import { rescheduleNotifications, setupNotifications } from '../features/notifications/schedule';
+import { useNotificationTaps } from '../features/notifications/useNotificationTaps';
 import { useSettings } from '../features/settings/store';
 import { usePalette } from '../ui/theme';
 import { fonts } from '../ui/tokens';
@@ -33,7 +34,7 @@ export default function RootLayout() {
   const { settings, loaded, load } = useSettings();
   const palette = usePalette();
   const session = useSession((s) => s.status);
-  useLockController(); // 잠금 판정·잠금 화면 이동
+  useNotificationTaps(session === 'in' && settings !== null);
 
   // 저장된 로그인 세션을 읽는다. 다 읽기 전에는 스플래시를 유지해서 로그인 화면이 잠깐 비치지 않게 한다.
   useEffect(() => {
@@ -44,7 +45,13 @@ export default function RootLayout() {
     if (!migrated) return;
     load();
     const cur = useSettings.getState().settings;
-    if (cur) rescheduleNotifications(cur).catch((e) => console.warn('reschedule failed', e));
+    if (!cur) return;
+    rescheduleNotifications(cur).catch((e) => console.warn('reschedule failed', e));
+    try {
+      purgeOldPhotos(cur);
+    } catch (e) {
+      console.warn('photo purge failed', e);
+    }
   }, [migrated, load]);
 
   // 로그인했고 설정이 생기면(앱 시작·로그인·온보딩 직후) 초기 전체 동기화 + 큐 비우기. 서버가 죽어 있어도 화면은 막지 않는다.
@@ -87,10 +94,6 @@ export default function RootLayout() {
         <Stack.Protected guard={loggedIn && onboarded}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="edit" />
-          <Stack.Screen
-            name="lock"
-            options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
-          />
           <Stack.Screen name="capture" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="friend" />
           <Stack.Screen name="friends-manage" />

@@ -40,7 +40,6 @@ export function DayCard({
   const summary = [
     meals.length > 0 ? t('records.mealsLogged', { n: meals.length }) : null,
     detail.gym ? t('records.gymDone') : null,
-    detail.locked ? t('records.lockedYes') : null,
     detail.sleep ? t('records.sleepDone') : null,
   ].filter(Boolean);
 

@@ -10,6 +10,8 @@ import { gymLogs } from '../../db/schema';
 import { formatDistance } from '../../domain/geo';
 import { addDays, atMinutes, dateKey, parseDateKey, toMinutes, weekKey, weekdayMon0 } from '../../domain/time';
 import { useRestCoupon } from '../../features/coupons/useCoupons';
+import { markGymDone } from '../../features/gym/checkIn';
+import { useGymArrival } from '../../features/location/useGymArrival';
 import { useGymDistance } from '../../features/location/useGymDistance';
 import { useSettingsValue } from '../../features/settings/store';
 import { formatRemaining, hhmm } from '../../features/today/format';
@@ -26,6 +28,7 @@ import { layout, radius, text } from '../../ui/tokens';
 const VERIFY_ROUTE_READY = true;
 const VERIFY_HREF = '/capture?purpose=gym' as Href;
 const RECENT = 5;
+const NO_PLACE = { lat: null, lng: null, radiusM: 0 };
 
 type Wd = '0' | '1' | '2' | '3' | '4' | '5' | '6';
 type GymLog = typeof gymLogs.$inferSelect;
@@ -65,6 +68,8 @@ export default function GymDetailScreen() {
 
   const canAct = !data.gym.doneToday;
   const waiting = data.gym.today && canAct;
+  // 오늘 갈 날이고 아직 인증 전이면, 이 화면을 연 동안 도착을 확인해 자동으로 인증한다. 위치는 폰 안에서만 쓴다.
+  useGymArrival(waiting ? gym : NO_PLACE, () => markGymDone('geofence'));
 
   const verify = () => {
     if (VERIFY_ROUTE_READY) router.push(VERIFY_HREF);

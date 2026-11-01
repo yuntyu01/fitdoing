@@ -100,7 +100,7 @@ function CalendarTab({ settings, now }: { settings: Settings; now: Date }) {
         note={
           empty
             ? t('records.monthEmpty')
-            : t('records.monthStats', { full: rec.summary.full, locked: rec.summary.locked, gym: rec.summary.gym })
+            : t('records.monthStats', { full: rec.summary.full, gym: rec.summary.gym })
         }
       />
       <CalendarLegend />

@@ -1,5 +1,7 @@
 # Android 릴리스
 
+> 2026-11-02부터 잠금 없는 버전이다. 잠금 엔진을 앱에서 분리해서 사용 기록 접근, 다른 앱 위에 표시, 포그라운드 서비스, 배터리 최적화 예외 권한이 빌드에 없다(docs/SPEC.md §12). 공개 방침과 데이터 보안 초안은 docs/privacy-policy-draft.md.
+
 워크플로: `.github/workflows/android-playstore.yml`
 
 - `v0.1.0` 같은 태그 push: 비공개 테스트(alpha) 트랙으로 업로드

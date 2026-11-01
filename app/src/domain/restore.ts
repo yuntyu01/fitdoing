@@ -147,6 +147,7 @@ export function fromSettingsBody(raw: unknown, defaults: Settings): Settings {
     lockMinutes: num(b.lockMinutes, defaults.lockMinutes),
     emergencyPerWeek: num(b.emergencyPerWeek, defaults.emergencyPerWeek),
     photoBackup: bool(b.photoBackup, defaults.photoBackup),
+    photoKeepDays: [30, 90, 180].includes(num(b.photoKeepDays, 0)) ? num(b.photoKeepDays, 0) : defaults.photoKeepDays,
     nickname: str(b.nickname, defaults.nickname),
     themeMode: oneOf(b.themeMode, THEME_MODES) ?? defaults.themeMode,
     accent: typeof b.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(b.accent) ? b.accent : defaults.accent,

@@ -2,19 +2,17 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { FoodItem, gymLogs, lockEvents } from '../../db/schema';
+import type { FoodItem, gymLogs } from '../../db/schema';
 import { formatNumber, roundKcal } from '../../domain/format';
 import { mealLabel } from '../../domain/meals';
 import { eatenFoodInMeal } from '../../domain/portion';
 import { eatenFactor } from '../../domain/stats';
 import { Divider } from '../../ui/Card';
-import { ListRow } from '../../ui/ListRow';
 import { useThemedStyles, type Palette } from '../../ui/theme';
 import { fonts, radius, text } from '../../ui/tokens';
 import { clock, eatenPct, kcalText, macroText, type MealRow } from './format';
 
 type GymRow = typeof gymLogs.$inferSelect;
-type LockRow = typeof lockEvents.$inferSelect;
 
 /**
  * 한 끼: "2끼 12:18 … 수정", 사진(있을 때만), 음식 줄(이름·양·섭취 % / 먹은 만큼의 kcal·탄단지), 합계.
@@ -145,35 +143,6 @@ export function GymSection({ gym }: { gym: GymRow }) {
   );
 }
 
-const LOCK_TYPE = { meal: 'day.lockMeal', gym: 'day.lockGym', sleep: 'day.lockSleep' } as const;
-const RELEASED = {
-  action: 'day.releasedAction',
-  time: 'day.releasedTime',
-  emergency: 'day.releasedEmergency',
-  coupon: 'day.releasedCoupon',
-} as const;
-
-/** 잠금: 그날 걸린 잠금마다 종류·시각·풀린 방법. 잠금 기록 없이 끼니만 잠김으로 남은 경우도 적는다. */
-export function LockSection({ locks, lockedMeals }: { locks: LockRow[]; lockedMeals: MealRow[] }) {
-  const { t } = useTranslation();
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View>
-      <Text style={styles.sectionTitle}>{t('day.locks')}</Text>
-      <View style={styles.lockList}>
-        {locks.map((l) => {
-          const range = [clock(l.startedAt), clock(l.endedAt)].filter(Boolean).join(' – ');
-          const how = l.releasedBy ? t(RELEASED[l.releasedBy]) : l.endedAt == null ? t('day.lockOngoing') : undefined;
-          return <ListRow key={l.id} label={t(LOCK_TYPE[l.type])} desc={range} value={how} />;
-        })}
-        {locks.length === 0
-          ? lockedMeals.map((m) => <ListRow key={m.index} label={t('day.mealLocked', { n: m.index })} />)
-          : null}
-      </View>
-    </View>
-  );
-}
-
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
     titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
@@ -197,5 +166,4 @@ const makeStyles = (c: Palette) =>
     totalRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingTop: 14 },
     totalLabel: { ...text.label, fontFamily: fonts.semibold, color: c.text },
     totalKcal: { ...text.heading, fontFamily: fonts.bold, color: c.text, fontVariant: ['tabular-nums'] },
-    lockList: { marginTop: 4 },
   });

@@ -68,9 +68,6 @@ export default function PermissionsStep() {
 
   const { gym, sleep } = draft;
   const kcal = draft.targets.kcal;
-  const modeLabel = { mild: t('settings.modeMild'), normal: t('settings.modeNormal'), spicy: t('settings.modeSpicy') }[
-    draft.mode
-  ];
 
   return (
     <Screen
@@ -89,7 +86,6 @@ export default function PermissionsStep() {
           label={t('onboarding.summarySleep')}
           value={sleep.enabled ? `${sleep.bedTime} · ${sleep.wakeTime}` : t('common.off')}
         />
-        <SummaryRow label={t('onboarding.summaryMode')} value={modeLabel} />
         <SummaryRow label={t('onboarding.summaryTargets')} value={`${formatNumber(kcal)} ${t('common.kcal')}`} />
       </View>
 
@@ -112,11 +108,6 @@ export default function PermissionsStep() {
           <ListRow
             label={t('onboarding.permLocation')}
             desc={t('onboarding.permLocationDesc')}
-            value={t('onboarding.permLater')}
-          />
-          <ListRow
-            label={t('onboarding.permUsage')}
-            desc={t('onboarding.permUsageDesc')}
             value={t('onboarding.permLater')}
           />
         </Rows>

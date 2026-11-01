@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Dumbbell, Lock } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Dumbbell } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -85,7 +85,6 @@ export function Calendar({ ym, weeks, facts, today, selected, onSelect, onShift,
                 <View style={styles.marks}>
                   {st === 'full' ? <Check size={MARK + 1} color={c.text} strokeWidth={2.5} /> : null}
                   {st === 'partial' ? <Circle size={MARK - 2} color={c.sub} strokeWidth={2.5} /> : null}
-                  {f?.locked ? <Lock size={MARK} color={c.sub} strokeWidth={2.2} /> : null}
                   {f?.gym ? <Dumbbell size={MARK} color={c.sub} strokeWidth={2.2} /> : null}
                 </View>
               </Pressable>
@@ -112,7 +111,6 @@ export function CalendarLegend() {
     <View style={styles.legend}>
       {item(<Check size={MARK + 1} color={c.sub} strokeWidth={2.5} />, t('records.legendFull'))}
       {item(<Circle size={MARK - 2} color={c.sub} strokeWidth={2.5} />, t('records.legendPartial'))}
-      {item(<Lock size={MARK} color={c.sub} strokeWidth={2.2} />, t('records.legendLocked'))}
       {item(<Dumbbell size={MARK} color={c.sub} strokeWidth={2.2} />, t('records.legendGym'))}
     </View>
   );

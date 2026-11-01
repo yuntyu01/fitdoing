@@ -52,6 +52,11 @@ function contentFor(n: PlannedNotification) {
         title: i18n.t('notif.gymTitle'),
         body: i18n.t('notif.gymBody', { time: n.arriveBy }),
       };
+    case 'sleep_start':
+      return {
+        title: i18n.t('notif.sleepTitle'),
+        body: i18n.t('notif.sleepBody', { time: n.bedTime }),
+      };
   }
 }
 
@@ -69,7 +74,7 @@ export async function rescheduleNotifications(settings: Settings, now = new Date
     .where(and(gte(mealLogs.date, from), eq(mealLogs.status, 'logged')))
     .all();
   const plan = planNotifications(
-    { meals: settings.meals, gym: settings.gym },
+    { meals: settings.meals, gym: settings.gym, sleep: settings.sleep },
     now,
     new Set(logged.map((l) => mealKey(l.date, l.index))),
   );
@@ -78,7 +83,7 @@ export async function rescheduleNotifications(settings: Settings, now = new Date
   for (const n of plan) {
     await Notifications.scheduleNotificationAsync({
       identifier: n.id,
-      content: contentFor(n),
+      content: { ...contentFor(n), data: { kind: n.kind } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at, channelId: CHANNEL_ID },
     });
   }

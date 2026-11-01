@@ -6,8 +6,6 @@ import { couponUses, gymLogs, lockEvents, mealLogs, settings as settingsTable, s
 import { snapshotToRows, type Snapshot } from '../../domain/restore';
 import { downloadMealPhoto } from '../api/client';
 import { resetSyncState, writeMeta } from '../api/store';
-import { getLockEngine } from '../lock/engine';
-import { useLock } from '../lock/store';
 import { deleteStoredPhoto, saveDownloadedPhoto } from '../meals/photos';
 import { rescheduleNotifications } from '../notifications/schedule';
 import { initialSettings } from '../settings/defaults';
@@ -27,10 +25,8 @@ function deletePhotos() {
   }
 }
 
-/** 잠금 엔진에 걸려 있던 잠금과 예약된 알림을 걷는다. (엔진 일정은 다음 설정 저장 때 새로 넘어간다) */
+/** 예약된 알림을 걷는다. */
 async function stopSchedules() {
-  const engine = getLockEngine();
-  await Promise.all((['meal', 'gym', 'sleep'] as const).map((t) => engine.releaseLock(t).catch(() => {})));
   await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
 }
 
@@ -53,7 +49,6 @@ export async function wipeLocalData(): Promise<void> {
   await resetSyncState();
   await stopSchedules();
   useSettings.getState().load();
-  useLock.setState({ active: null, notifyOnly: null });
 }
 
 /**
@@ -86,7 +81,6 @@ export async function restoreFromSnapshot(snapshot: Snapshot): Promise<void> {
   writeMeta({ initialDone: true });
 
   useSettings.getState().load();
-  useLock.getState().refresh();
   rescheduleNotifications(settings).catch((e) => console.warn('reschedule failed', e));
   void restorePhotos(snapshot.photos ?? []);
 }

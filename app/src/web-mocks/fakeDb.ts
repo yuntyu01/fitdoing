@@ -38,6 +38,7 @@ export const seedSettings: Settings = {
   lockMinutes: 120,
   emergencyPerWeek: 2,
   photoBackup: false,
+  photoKeepDays: null,
   nickname: '지훈',
   themeMode: 'system',
   accent: '#FFFFFF',
