@@ -60,7 +60,7 @@ docker build -t fitdoing-server .   # KoDeploy용 멀티스테이지 이미지
 
 키가 없는 로그인은 503 `PROVIDER_NOT_CONFIGURED`를 돌려준다.
 
-`GET /healthz` 로 상태를 확인한다. 테이블은 시작할 때 자동 생성·갱신한다(AutoMigrate). 로그인 이전(기기 ID 기준) 스키마의 DB를 만나면 그 테이블을 모두 지우고 계정 기준으로 새로 만든다(기기 ID 백업은 계정에 연결할 수 없어서 버린다).
+`GET /healthz` 로 상태를 확인한다. 테이블은 시작할 때 자동 생성·갱신한다(AutoMigrate). 로그인 이전(기기 ID 기준) 스키마를 만나면 데이터를 그대로 보존하고 시작을 중단한다. 별도 검토한 이전 절차 없이 테이블을 삭제하지 않는다. 로그인 설정과 기존 테스트 기기의 전환은 `docs/social-login-setup.md`를 참고한다. `GET /api/auth/providers`는 Google·카카오 설정 여부만 반환한다.
 
 ## AI (음식 인식)
 - `ai.FoodAnalyzer` 인터페이스. `AI_PROVIDER=mock`(기본, 사진 해시로 고른 고정 샘플) | `gemini`.

@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Provider } from '../domain/auth';
+import { ApiError } from '../features/api/client';
 import { finishLogin } from '../features/auth/afterLogin';
 import { loginWithApple, loginWithGoogle, loginWithKakao } from '../features/auth/providers';
 import { usePalette, useThemedStyles, type Palette } from '../ui/theme';
@@ -45,18 +46,17 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
   const [busy, setBusy] = useState<Provider | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<'generic' | 'conflict' | null>(null);
 
   const run = async (provider: Provider, getToken: () => Promise<string | null>) => {
     if (busy) return;
     setBusy(provider);
-    setFailed(false);
+    setFailed(null);
     try {
       const token = await getToken();
       if (token) await finishLogin(provider, token); // null 은 사용자가 취소한 것이라 아무 말도 하지 않는다
     } catch (e) {
-      console.warn('login failed', e);
-      setFailed(true);
+      setFailed(e instanceof ApiError && e.status === 409 ? 'conflict' : 'generic');
     } finally {
       setBusy(null);
     }
@@ -72,7 +72,7 @@ export default function LoginScreen() {
 
         <View style={styles.bottom}>
           {busy ? <Text style={styles.status}>{t('login.busy')}</Text> : null}
-          {failed && !busy ? <Text style={styles.error}>{t('login.failed')}</Text> : null}
+          {failed && !busy ? <Text style={styles.error}>{t(failed === 'conflict' ? 'login.conflict' : 'login.failed')}</Text> : null}
           <ProviderButton
             label={t('login.kakao')}
             onPress={() => run('kakao', loginWithKakao)}

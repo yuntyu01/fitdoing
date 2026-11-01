@@ -47,7 +47,7 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 	}
 	resolve := authSvc.Resolve
 	if o.AuthDisabled {
-		resolve = authSvc.DevResolve
+		resolve = authSvc.ResolveTransition
 	}
 	// core builds the mutually dependent services on one DB handle, so a transaction can get its own set.
 	core := func(h *gorm.DB) (*settings.Service, *lock.Service, *gym.Service, *coupon.Service) {
@@ -70,7 +70,12 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 	mealSvc.OnDelete = func(uid string, d platform.Date, i int) error {
 		return photoSvc.Delete(context.Background(), uid, d, i)
 	}
-	authSvc.BeforeDelete = []func(string) error{func(uid string) error { return photoSvc.DeleteAll(context.Background(), uid) }}
+	authSvc.BeforeDelete = []func(string) error{func(uid string) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return photoSvc.DeleteAll(ctx, uid)
+	}}
+	authSvc.CleanupPhotos = photoSvc.ProcessDeletions
 	syncSvc.Photos = photoSvc.Refs
 
 	mux := http.NewServeMux()
@@ -78,7 +83,7 @@ func New(db *gorm.DB, analyzer ai.FoodAnalyzer, clock platform.Clock, corsOrigin
 		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	settings.Register(mux, settingsSvc)
-	auth.Register(mux, authSvc)
+	auth.Register(mux, authSvc, o.AuthDisabled)
 	models := o.AIModels
 	if models == nil {
 		models = ai.SingleModel(db, "default", analyzer)

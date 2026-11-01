@@ -18,6 +18,10 @@ export const AUTH_DISABLED = process.env.EXPO_PUBLIC_AUTH_DISABLED === '1';
 const DEVICE_TOKEN_KEY = 'fitdoing.deviceToken';
 const DEVICE_USER = 'device'; // 로컬 표시용 (서버의 실제 사용자 id 는 토큰에서 나온다)
 
+/** Existing test installation proof; never create a new device token just to link an account. */
+export const existingDeviceToken = (): Promise<string | null> => secureGet(DEVICE_TOKEN_KEY);
+export const clearDeviceToken = (): Promise<void> => safe(() => secureDelete(DEVICE_TOKEN_KEY), undefined);
+
 async function deviceToken(): Promise<string> {
   const saved = await safe(() => secureGet(DEVICE_TOKEN_KEY), null);
   if (saved) return saved;

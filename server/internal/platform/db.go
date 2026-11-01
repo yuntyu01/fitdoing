@@ -14,8 +14,10 @@ import (
 // User is the owner of all data; every other table references it with ON DELETE CASCADE.
 // A user is created by the first login with a provider account (see package auth).
 type User struct {
-	ID        string    `gorm:"column:id;primaryKey;size:36"`
-	CreatedAt time.Time `gorm:"column:created_at;not null"`
+	ID          string    `gorm:"column:id;primaryKey;size:36"`
+	CreatedAt   time.Time `gorm:"column:created_at;not null"`
+	AuthVersion uint64    `gorm:"not null;default:0"`
+	AuthBlocked bool      `gorm:"not null;default:false"`
 }
 
 func (User) TableName() string { return "users" }

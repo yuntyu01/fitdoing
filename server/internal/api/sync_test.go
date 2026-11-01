@@ -2,15 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/yuntyu01/fitdoing/server/internal/platform"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
-	"time"
-
-	"github.com/yuntyu01/fitdoing/server/internal/ai"
-	"github.com/yuntyu01/fitdoing/server/internal/platform"
 )
 
 // the app <-> server contract examples; the server must accept them as they are
@@ -320,7 +317,7 @@ func TestEmptySnapshot(t *testing.T) {
 	e.do("GET", "/api/sync/snapshot", "", "").code(t, 401, "UNAUTHORIZED")
 }
 
-func TestMigrateDropsDeviceKeyedSchema(t *testing.T) {
+func TestMigratePreservesLegacyDeviceData(t *testing.T) {
 	cases := map[string][]string{
 		"before login (devices table)": {
 			`CREATE TABLE devices (device_id text PRIMARY KEY, created_at datetime NOT NULL)`,
@@ -344,24 +341,19 @@ func TestMigrateDropsDeviceKeyedSchema(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := Migrate(db); err != nil {
-				t.Fatal(err)
+			if err := Migrate(db); err == nil {
+				t.Fatal("unsafe legacy migration allowed")
 			}
-			m := db.Migrator()
-			if m.HasTable("devices") || m.HasColumn("meal_logs", "device_id") || m.HasColumn("user_settings", "device_id") {
-				t.Fatal("device-keyed schema remains")
+			table := "user_settings"
+			if db.Migrator().HasTable("devices") {
+				table = "meal_logs"
 			}
-			e := &env{t: t, db: db, srv: New(db, ai.Mock{}, platform.Clock{Loc: time.UTC}, nil, newAuth(db))}
-			e.tok, e.uid = e.login("someone")
-			e.get("/api/settings").is(t, 200).eq(t, "settings.heightCm", 175)
-			if n := e.count("meal_logs"); n != 0 {
-				t.Fatalf("old rows survived: %d", n)
+			var count int64
+			if err := db.Table(table).Count(&count).Error; err != nil || count != 1 {
+				t.Fatalf("legacy rows changed: count=%d err=%v", count, err)
 			}
-			if err := Migrate(db); err != nil { // running it again keeps the data
-				t.Fatal(err)
-			}
-			if n := e.count("users"); n != 1 {
-				t.Fatalf("users = %d", n)
+			if db.Migrator().HasTable("users") {
+				t.Fatal("partial migration performed")
 			}
 		})
 	}

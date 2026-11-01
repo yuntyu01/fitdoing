@@ -5,7 +5,7 @@ import type { Snapshot } from '../../domain/restore';
 import { fetchSnapshot, loginToServer } from '../api/client';
 import { writeMeta } from '../api/store';
 import { restoreFromSnapshot, wipeLocalData } from './restore';
-import { setOwnerId, setSession, useSession } from './session';
+import { clearDeviceToken, existingDeviceToken, setOwnerId, setSession, useSession } from './session';
 
 /**
  * 제공자 토큰으로 서버에 로그인하고, 폰 데이터를 어떻게 할지 정한 뒤(domain/auth.ts) 세션을 연다.
@@ -13,7 +13,8 @@ import { setOwnerId, setSession, useSession } from './session';
  * 서버·DB 오류는 던진다(세션은 열리지 않고 로그인 화면에 남는다).
  */
 export async function finishLogin(provider: Provider, providerToken: string): Promise<void> {
-  const { token, userId } = await loginToServer(provider, providerToken);
+  const legacyToken = await existingDeviceToken();
+  const { token, userId } = await loginToServer(provider, providerToken, legacyToken);
 
   const ownerId = useSession.getState().ownerId;
   const hasLocalSettings = db.select().from(settingsTable).get() != null;
@@ -35,4 +36,5 @@ export async function finishLogin(provider: Provider, providerToken: string): Pr
 
   await setOwnerId(userId);
   await setSession(token, userId);
+  await clearDeviceToken();
 }
