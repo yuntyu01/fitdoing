@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { formatNumber, roundGram, roundKcal } from '../../domain/format';
 import { targetsOn, type TargetEntry, type Targets } from '../../domain/targets';
@@ -33,12 +33,15 @@ export function WeeklyCard({
   targets,
   history,
   now,
+  style,
 }: {
   rows: WeeklyRow[];
   targets: Targets;
   /** 날짜별 목표. 지난 날은 그날 목표로 본다. */
   history: TargetEntry[];
   now: Date;
+  /** 카드 모양을 바꿀 때 (홈의 유리 카드) */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { t } = useTranslation();
   const styles = useThemedStyles(makeStyles);
@@ -72,7 +75,7 @@ export function WeeklyCard({
     });
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       <View style={styles.head}>
         <Text style={styles.title}>{t('weekly.title')}</Text>
         <Text style={styles.range}>{t('weekly.range', { from: md(monday), to: md(sunday) })}</Text>

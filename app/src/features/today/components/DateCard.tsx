@@ -4,11 +4,11 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { addDays, dateKey, parseDateKey, weekKey, weekdayMon0 } from '../../../domain/time';
 import { useThemedStyles, usePalette, type Palette } from '../../../ui/theme';
-import { fonts, layout, radius } from '../../../ui/tokens';
+import { fonts, glass, layout } from '../../../ui/tokens';
 
 type Wd = '0' | '1' | '2' | '3' | '4' | '5' | '6';
 
-/** 날짜 제목 + "N일째 기록 중" + 이번 주 요일 줄. 기록한 지난 날은 날짜 대신 작은 체크, 오늘만 얇은 테두리. */
+/** 날짜 제목 + "N일째 기록 중" + 이번 주 요일 줄. 기록한 지난 날은 날짜 대신 작은 체크, 오늘만 카드 색 상자. */
 export function DateCard({
   now,
   streak,
@@ -28,7 +28,7 @@ export function DateCard({
   const wd = String(weekdayMon0(now)) as Wd;
 
   return (
-    <View style={[styles.wrap, { paddingTop: topInset + 4 }]}>
+    <View style={[styles.wrap, { paddingTop: topInset + 16 }]}>
       <View style={styles.head}>
         <Text style={styles.date}>
           {t('date.full', { month: now.getMonth() + 1, day: now.getDate(), weekday: t(`weekdayLong.${wd}`) })}
@@ -67,23 +67,21 @@ const makeStyles = (c: Palette) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: layout.labelGap,
-      paddingHorizontal: layout.header,
-      marginBottom: 20, // 시안: 날짜 제목 → 요일 줄 (글자 사이 약 25)
+      paddingHorizontal: glass.header,
+      marginBottom: 18,
     },
     date: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 25, lineHeight: 32, color: c.text },
     streak: { fontFamily: fonts.regular, fontSize: 14, color: c.sub },
-    week: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: layout.strip },
+    week: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: glass.side },
     day: {
       flex: 1,
       maxWidth: 50,
       alignItems: 'center',
       paddingVertical: 6,
-      borderRadius: radius.day,
-      borderWidth: layout.hairline,
-      borderColor: 'transparent',
+      borderRadius: glass.tileRadius,
       gap: 4,
     },
-    today: { borderColor: c.focus },
+    today: { backgroundColor: c.card },
     wd: { fontFamily: fonts.regular, fontSize: 13, color: c.sub },
     onText: { fontFamily: fonts.semibold, color: c.text },
     numBox: { height: 24, justifyContent: 'center' },

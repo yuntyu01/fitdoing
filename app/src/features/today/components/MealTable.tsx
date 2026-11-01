@@ -8,7 +8,7 @@ import { mealLabel } from '../../../domain/meals';
 import { eatenFactor } from '../../../domain/stats';
 import { remainingPerMeal, type Targets } from '../../../domain/targets';
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
-import { fonts, layout, radius } from '../../../ui/tokens';
+import { fonts, glass, layout } from '../../../ui/tokens';
 import type { TodayData } from '../useToday';
 
 /**
@@ -99,13 +99,12 @@ export function MealTable({ data, targets }: { data: TodayData; targets: Targets
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
-    // 시안 실측: 위 13, 아래 9, 행 간격 37.5
     card: {
       backgroundColor: c.card,
-      borderRadius: radius.block,
-      paddingHorizontal: layout.cardPad,
-      paddingTop: 13,
-      paddingBottom: 9,
+      borderRadius: glass.cardRadius,
+      paddingHorizontal: glass.cardPad,
+      paddingTop: 18,
+      paddingBottom: 10,
     },
     head: {
       flexDirection: 'row',

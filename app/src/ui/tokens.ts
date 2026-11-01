@@ -38,6 +38,23 @@ export const layout = {
   related: 8, // 관련된 글자 사이
 } as const;
 
+// 유리 디자인(홈·탭바) 치수. modo 앱의 코드값, 모바일 논리 픽셀.
+export const glass = {
+  side: 15, // 카드 좌우
+  gap: 10, // 카드 사이
+  cardRadius: 16, // 큰 카드
+  tileRadius: 14.5, // 끼니 카드·오늘 날짜 상자
+  cardPad: 20, // 큰 카드 안 좌우 (modo 22.5, 숫자 표가 들어가서 조금 줄임)
+  tileGap: 8, // 끼니 카드 사이
+  header: 24, // 날짜 제목·안내 글자 좌우
+  navSide: 19, // 탭바 좌우
+  navHeight: 49.4,
+  navPad: 22, // 탭바 안 좌우
+  navTabW: 65, // 탭 하나 (고른 탭의 알약 크기)
+  navTabH: 38,
+  navMinBottom: 26, // 화면 아래 끝에서 탭바까지 최소
+} as const;
+
 // 글자 위계 (색은 테마에서). 제목·핵심 숫자만 굵게, 항목명·시간·단위는 가볍게.
 export const text = {
   title: { fontFamily: 'Pretendard-Bold', fontSize: 24, lineHeight: 32 }, // 화면 제목
@@ -57,4 +74,3 @@ export const fonts = {
   semibold: 'Pretendard-SemiBold',
   bold: 'Pretendard-Bold',
 } as const;
-

@@ -3,7 +3,7 @@ import { Camera } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
-import { layout, size } from '../../../ui/tokens';
+import { glass, layout, size } from '../../../ui/tokens';
 
 const RING_GAP = 4; // 마감 임박 링과 버튼 사이
 
@@ -38,7 +38,7 @@ const makeStyles = (c: Palette) =>
   StyleSheet.create({
     ring: {
       position: 'absolute',
-      right: layout.screen - RING_GAP,
+      right: glass.navSide - RING_GAP,
       padding: RING_GAP - layout.hairline,
       borderRadius: size.fab / 2 + RING_GAP,
       borderWidth: layout.hairline,

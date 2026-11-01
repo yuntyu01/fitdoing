@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { formatNumber, roundGram, roundKcal } from '../../../domain/format';
 import { ratio, type Nutrition } from '../../../domain/stats';
@@ -18,6 +18,7 @@ export function TotalsCard({
   loggedCount,
   title,
   compact: compactProp,
+  style,
 }: {
   totals: Nutrition;
   targets: Targets;
@@ -26,6 +27,8 @@ export function TotalsCard({
   title?: string;
   /** 탄단지 목표를 숫자 아래 줄에 둔다. 기본은 화면 폭으로 정하고, 여백이 넓은 화면(기록)은 늘 켠다. */
   compact?: boolean;
+  /** 카드 모양을 바꿀 때 (홈의 유리 카드) */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { t } = useTranslation();
   const c = usePalette();
@@ -39,7 +42,7 @@ export function TotalsCard({
   ] as const;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       <View style={styles.head}>
         <Text style={styles.title}>{title ?? t('home.totals')}</Text>
         <Text style={styles.meta}>{t('home.loggedCount', { n: loggedCount })}</Text>

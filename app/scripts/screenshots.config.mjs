@@ -70,7 +70,8 @@ export const SCREENS = [
     actions: async (page) => {
       await page.evaluate(() => {
         for (const el of document.querySelectorAll('div')) {
-          if (el.scrollHeight > el.clientHeight + 50 && getComputedStyle(el).overflowY !== 'visible')
+          // overflow: hidden 인 상자(상태 표시줄 덮개)는 스크롤 영역이 아니다
+          if (el.scrollHeight > el.clientHeight + 50 && ['auto', 'scroll'].includes(getComputedStyle(el).overflowY))
             el.scrollTop = el.scrollHeight;
         }
       });

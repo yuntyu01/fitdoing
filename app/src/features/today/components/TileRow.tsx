@@ -7,12 +7,12 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import type { Settings } from '../../../db/schema';
 import { dateKey } from '../../../domain/time';
 import { usePalette, useThemedStyles, type Palette } from '../../../ui/theme';
-import { fonts, layout, radius } from '../../../ui/tokens';
+import { fonts, glass, layout } from '../../../ui/tokens';
 import { formatRemaining, hhmm } from '../format';
 import type { TodayData } from '../useToday';
 
 const W = layout.tile;
-const GAP = layout.tileGap;
+const GAP = glass.tileGap;
 const STEP = W + GAP;
 const TITLE_LH = 20;
 const SUB_LH = 16;
@@ -33,7 +33,7 @@ export function TileRow({ data, settings, now }: { data: TodayData; settings: Se
   const ref = useRef<ScrollView>(null);
 
   const count = data.meals.length + (settings.gym.enabled ? 1 : 0);
-  const side = layout.strip;
+  const side = glass.side;
   let focus = data.meals.findIndex((m) => m.state === 'current');
   if (focus < 0) focus = data.meals.findIndex((m) => m.state === 'upcoming');
   if (focus < 0) focus = count - 1;
@@ -116,7 +116,7 @@ const makeStyles = (c: Palette) =>
     tile: {
       width: W,
       height: W,
-      borderRadius: radius.blockTile,
+      borderRadius: glass.tileRadius,
       backgroundColor: c.card,
       paddingHorizontal: 6,
       alignItems: 'center',
