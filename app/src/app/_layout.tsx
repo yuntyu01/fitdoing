@@ -34,7 +34,6 @@ export default function RootLayout() {
   const { settings, loaded, load } = useSettings();
   const palette = usePalette();
   const session = useSession((s) => s.status);
-  useNotificationTaps(session === 'in' && settings !== null);
 
   // 저장된 로그인 세션을 읽는다. 다 읽기 전에는 스플래시를 유지해서 로그인 화면이 잠깐 비치지 않게 한다.
   useEffect(() => {
@@ -72,6 +71,8 @@ export default function RootLayout() {
   }, []);
 
   const ready = (fontsLoaded || fontError) && loaded && session !== 'loading';
+  // Stack 을 그리기 전에 이동하면 홈 없이 그 화면만 쌓이므로, 아래에서 Stack 을 그릴 때와 같은 조건을 넘긴다.
+  useNotificationTaps(!!ready && loggedIn && hasSettings);
 
   useEffect(() => {
     if (ready || migrationError) SplashScreen.hideAsync();

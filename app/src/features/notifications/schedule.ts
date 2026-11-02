@@ -60,8 +60,19 @@ function contentFor(n: PlannedNotification) {
   }
 }
 
-/** 예약된 알림을 모두 지우고 앞으로 7일치를 다시 건다. 찍은 끼니는 빠진다. */
-export async function rescheduleNotifications(settings: Settings, now = new Date()) {
+let lastRun: Promise<unknown> = Promise.resolve();
+
+/**
+ * 예약된 알림을 모두 지우고 앞으로 7일치를 다시 건다. 찍은 끼니는 빠진다.
+ * 호출이 겹치면 앞 호출의 남은 예약이 뒤 호출 뒤에 들어가서 (알림을 껐는데 울리는 등) 차례대로 돌린다.
+ */
+export function rescheduleNotifications(settings: Settings, now = new Date()): Promise<void> {
+  const run = lastRun.then(() => applySchedule(settings, now));
+  lastRun = run.catch(() => {});
+  return run;
+}
+
+async function applySchedule(settings: Settings, now: Date) {
   // 설정에서 마감 알림을 끄면 예약된 알림을 모두 지우고 새로 잡지 않는다
   if (settings.notifications === false) {
     await Notifications.cancelAllScheduledNotificationsAsync();
